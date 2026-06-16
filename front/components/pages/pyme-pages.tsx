@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, ClipboardCheck, CreditCard, Package, PackagePlus, Route, Star } from "lucide-react";
 import { useState } from "react";
@@ -356,18 +356,112 @@ export function PymeCargaDetailPage({ id }: { id: number }) {
 }
 
 export function PymeViajesPage() {
+  const searchParams = useSearchParams();
+  const tab = normalizePymeViajesTab(searchParams.get("tab"));
   const resource = useResource(loadViajesWithCargas, []);
   return (
     <AppLayout role="PYME">
-      <SectionTitle title="Mis viajes" />
+      <SectionTitle title={tab === "pagos" ? "Mis pagos" : tab === "tracking" ? "Tracking" : "Mis viajes"} />
       {resource.loading ? <LoadingState /> : null}
       {resource.error ? <ErrorState message={resource.error} onRetry={resource.reload} /> : null}
       {resource.data?.viajes.length === 0 ? <EmptyState title="Sin viajes" text="Los viajes aparecen cuando aceptas una oferta." /> : null}
-      <div className="grid gap-4">
-        {resource.data?.viajes.map((viaje) => (
-          <ViajeCard key={viaje.id} viaje={viaje} carga={resource.data?.cargas[viaje.carga_id]} href={`/pyme/viajes/${viaje.id}`} />
-        ))}
-      </div>
+      {resource.data ? (
+        tab === "pagos" ? (
+          <div className="grid gap-4">
+            {resource.data.viajes.map((viaje) => {
+              const carga = resource.data.cargas[viaje.carga_id];
+              const pago = resource.data.pagos[viaje.id];
+              return (
+                <Card key={viaje.id} className="p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-bold uppercase text-slate-400">Viaje #{viaje.id}</p>
+                      <h2 className="mt-1 font-black text-slate-950">{carga?.titulo ?? "Carga sin detalle"}</h2>
+                      <p className="text-sm text-slate-500">
+                        {carga ? `${carga.origen_ciudad}, ${carga.origen_provincia} -> ${carga.destino_ciudad}, ${carga.destino_provincia}` : "Detalle de ruta no disponible"}
+                      </p>
+                    </div>
+                    <Link href={`/pyme/viajes/${viaje.id}`} className="inline-flex min-h-[38px] items-center gap-2 rounded-md border border-line px-4 py-2 text-sm font-semibold text-navy">
+                      Ver viaje <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+                  {pago ? (
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                      <div className="rounded-xl border border-line bg-white p-3">
+                        <p className="text-xs font-bold uppercase text-slate-400">Total</p>
+                        <p className="mt-1 text-lg font-black text-slate-950">{money(pago.monto_total)}</p>
+                      </div>
+                      <div className="rounded-xl border border-line bg-white p-3">
+                        <p className="text-xs font-bold uppercase text-slate-400">Comision</p>
+                        <p className="mt-1 text-lg font-black text-slate-950">{money(pago.comision_plataforma)}</p>
+                      </div>
+                      <div className="rounded-xl border border-line bg-white p-3">
+                        <p className="text-xs font-bold uppercase text-slate-400">Estado</p>
+                        <div className="mt-2">
+                          <StatusBadge value={pago.estado} />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-sm text-slate-500">Todavia no hay pago registrado para este viaje.</p>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        ) : tab === "tracking" ? (
+          <div className="grid gap-4">
+            {resource.data.viajes.map((viaje) => {
+              const carga = resource.data.cargas[viaje.carga_id];
+              const lastPosition = resource.data.lastTracking[viaje.id];
+              return (
+                <Card key={viaje.id} className="p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-bold uppercase text-slate-400">Viaje #{viaje.id}</p>
+                      <h2 className="mt-1 font-black text-slate-950">{carga?.titulo ?? "Carga sin detalle"}</h2>
+                      <p className="text-sm text-slate-500">
+                        {carga ? `${carga.origen_ciudad}, ${carga.origen_provincia} -> ${carga.destino_ciudad}, ${carga.destino_provincia}` : "Detalle de ruta no disponible"}
+                      </p>
+                    </div>
+                    <Link href={`/pyme/viajes/${viaje.id}`} className="inline-flex min-h-[38px] items-center gap-2 rounded-md border border-line px-4 py-2 text-sm font-semibold text-navy">
+                      Ver tracking <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </div>
+                  {lastPosition ? (
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                      <div className="rounded-xl border border-line bg-white p-3">
+                        <p className="text-xs font-bold uppercase text-slate-400">Ultima actualizacion</p>
+                        <p className="mt-1 text-sm font-bold text-slate-950">{formatDate(lastPosition.timestamp)}</p>
+                      </div>
+                      <div className="rounded-xl border border-line bg-white p-3">
+                        <p className="text-xs font-bold uppercase text-slate-400">Velocidad</p>
+                        <p className="mt-1 text-sm font-bold text-slate-950">
+                          {lastPosition.velocidad != null ? `${numberValue(lastPosition.velocidad)} km/h` : "Sin dato"}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-line bg-white p-3">
+                        <p className="text-xs font-bold uppercase text-slate-400">Estado</p>
+                        <div className="mt-2">
+                          <StatusBadge value={viaje.estado} />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-sm text-slate-500">Todavia no hay posiciones de tracking para este viaje.</p>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {resource.data.viajes.map((viaje) => (
+              <ViajeCard key={viaje.id} viaje={viaje} carga={resource.data.cargas[viaje.carga_id]} href={`/pyme/viajes/${viaje.id}`} />
+            ))}
+          </div>
+        )
+      ) : null}
     </AppLayout>
   );
 }
@@ -593,17 +687,44 @@ async function loadOptionalProfile(): Promise<EmpresaPyme | null> {
 
 async function loadViajesWithCargas() {
   const viajes = await api.viajes.mine();
-  const pairs = await Promise.all(
-    viajes.map(async (viaje) => {
-      try {
-        return [viaje.carga_id, await api.cargas.get(viaje.carga_id)] as const;
-      } catch {
-        return [viaje.carga_id, undefined] as const;
-      }
-    })
-  );
+  const [pairs, pagos, lastTracking] = await Promise.all([
+    Promise.all(
+      viajes.map(async (viaje) => {
+        try {
+          return [viaje.carga_id, await api.cargas.get(viaje.carga_id)] as const;
+        } catch {
+          return [viaje.carga_id, undefined] as const;
+        }
+      })
+    ),
+    Promise.all(
+      viajes.map(async (viaje) => {
+        try {
+          return [viaje.id, await api.pagos.get(viaje.id)] as const;
+        } catch {
+          return [viaje.id, null] as const;
+        }
+      })
+    ),
+    Promise.all(
+      viajes.map(async (viaje) => {
+        try {
+          return [viaje.id, await api.tracking.last(viaje.id)] as const;
+        } catch {
+          return [viaje.id, null] as const;
+        }
+      })
+    )
+  ]);
   return {
     viajes,
-    cargas: Object.fromEntries(pairs.filter(([, carga]) => Boolean(carga))) as Record<number, Carga>
+    cargas: Object.fromEntries(pairs.filter(([, carga]) => Boolean(carga))) as Record<number, Carga>,
+    pagos: Object.fromEntries(pagos) as Record<number, Pago | null>,
+    lastTracking: Object.fromEntries(lastTracking) as Record<number, TrackingPosition | null>
   };
+}
+
+function normalizePymeViajesTab(tab: string | null) {
+  if (tab === "pagos" || tab === "tracking") return tab;
+  return "viajes";
 }

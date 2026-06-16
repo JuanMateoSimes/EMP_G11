@@ -29,8 +29,8 @@ export const navByRole: Record<Role, Array<{ href: string; label: string; icon: 
     { href: "/pyme/cargas", label: "Mis cargas", icon: Package },
     { href: "/pyme/cargas/nueva", label: "Publicar carga", icon: PackagePlus },
     { href: "/pyme/viajes", label: "Viajes", icon: Route },
-    { href: "/pyme/viajes", label: "Pagos", icon: WalletCards },
-    { href: "/pyme/viajes", label: "Tracking", icon: Bell },
+    { href: "/pyme/viajes?tab=pagos", label: "Pagos", icon: WalletCards },
+    { href: "/pyme/viajes?tab=tracking", label: "Tracking", icon: Bell },
     { href: "/pyme/perfil", label: "Perfil", icon: UserRound }
   ],
   TRANSPORTISTA: [
