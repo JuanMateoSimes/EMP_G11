@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: logexpress-postgres
+    environment:
+      POSTGRES_DB: logexpress
+      POSTGRES_USER: logexpress
+      POSTGRES_PASSWORD: logexpress
+    ports:
+      - "5432:5432"
+    volumes:
+      - logexpress_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U logexpress -d logexpress"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  logexpress_pgdata:
