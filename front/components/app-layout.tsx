@@ -42,8 +42,8 @@ export function AppLayout({ role, children }: { role: Role; children: React.Reac
   const nav = navByRole[role];
 
   return (
-    <main className="min-h-screen p-0 md:p-6">
-      <div className="mx-auto flex min-h-screen max-w-[1440px] flex-col overflow-hidden bg-white shadow-panel md:min-h-[calc(100vh-48px)] md:rounded-[22px] md:border-[7px] md:border-ink lg:flex-row">
+    <main className="min-h-screen p-0 md:p-3 2xl:p-4">
+      <div className="mx-auto flex min-h-screen w-full max-w-[1880px] flex-col overflow-hidden bg-white shadow-panel md:min-h-[calc(100vh-24px)] md:rounded-[18px] md:border-[5px] md:border-ink 2xl:min-h-[calc(100vh-32px)] lg:flex-row">
         <aside
           className={cx(
             "bg-ink text-white lg:flex lg:w-[220px] lg:flex-col",
@@ -127,8 +127,8 @@ export function AppLayout({ role, children }: { role: Role; children: React.Reac
               <RoleBadge value={user.rol} />
             </div>
           </header>
-          <div className="flex-1 overflow-y-auto p-4 md:p-6">
-            <div className="mx-auto max-w-[1180px]">{children}</div>
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 xl:p-8">
+            <div className="w-full">{children}</div>
           </div>
         </section>
       </div>
