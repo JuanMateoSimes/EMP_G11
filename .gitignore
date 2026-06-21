@@ -21,6 +21,12 @@ front/.env.production.local
 front/next-dev.log
 front/next-dev.err.log
 
+# Node / landing
+landing/node_modules/
+landing/.next/
+landing/out/
+landing/.env.local
+
 # Local/editor
 .DS_Store
 Thumbs.db
