@@ -7,6 +7,7 @@ import {
   Package,
   PackagePlus,
   Route,
+  Settings,
   ShieldCheck,
   Truck,
   UserRound,
@@ -22,7 +23,8 @@ export const navByRole: Record<Role, Array<{ href: string; label: string; icon: 
     { href: "/admin/documentos", label: "Documentos", icon: FileCheck2 },
     { href: "/admin/transportistas", label: "Verificacion", icon: ShieldCheck },
     { href: "/admin/viajes", label: "Viajes", icon: Route },
-    { href: "/admin/perfil", label: "Perfil", icon: UserRound }
+    { href: "/admin/perfil", label: "Perfil", icon: UserRound },
+    { href: "/dashboard/configuracion", label: "Configuración", icon: Settings }
   ],
   PYME: [
     { href: "/pyme/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -31,7 +33,9 @@ export const navByRole: Record<Role, Array<{ href: string; label: string; icon: 
     { href: "/pyme/viajes", label: "Viajes", icon: Route },
     { href: "/pyme/viajes?tab=pagos", label: "Pagos", icon: WalletCards },
     { href: "/pyme/viajes?tab=tracking", label: "Tracking", icon: Bell },
-    { href: "/pyme/perfil", label: "Perfil", icon: UserRound }
+    { href: "/pyme/contratos", label: "Contratos", icon: Files },
+    { href: "/pyme/perfil", label: "Perfil", icon: UserRound },
+    { href: "/dashboard/configuracion", label: "Configuración", icon: Settings }
   ],
   TRANSPORTISTA: [
     { href: "/transportista/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -40,6 +44,7 @@ export const navByRole: Record<Role, Array<{ href: string; label: string; icon: 
     { href: "/transportista/viajes", label: "Viajes", icon: Route },
     { href: "/transportista/vehiculos", label: "Vehiculos", icon: Truck },
     { href: "/transportista/documentos", label: "Documentos", icon: Files },
-    { href: "/transportista/perfil", label: "Perfil", icon: UserRound }
+    { href: "/transportista/perfil", label: "Perfil", icon: UserRound },
+    { href: "/dashboard/configuracion", label: "Configuración", icon: Settings }
   ]
 };

@@ -108,14 +108,12 @@ export interface Documento {
 export interface Carga {
   id: number;
   empresa_id: number;
+  idsTiposAcoplados: number[];
   titulo: string;
   descripcion?: string | null;
   tipo_mercaderia: string;
   peso_kg: DecimalValue;
   volumen_m3: DecimalValue;
-  requiere_refrigeracion: boolean;
-  requiere_rampa: boolean;
-  requiere_mantas: boolean;
   origen_direccion: string;
   origen_ciudad: string;
   origen_provincia: string;
@@ -136,10 +134,10 @@ export interface Carga {
   tarifa: DecimalValue;
   tarifa_base_ton_km: number;
   incluyeIVA: boolean;
-  hora_inicio_carga: string;
-  hora_fin_carga: string;
-  hora_inicio_descarga: string;
-  hora_fin_descarga: string;
+  hora_inicio_carga?: string | null;
+  hora_fin_carga?: string | null;
+  hora_inicio_descarga?: string | null;
+  hora_fin_descarga?: string | null;
   requiere_balanza: boolean;
   ubicacion_balanza?: string | null;
   hora_inicio_balanza?: string | null;
@@ -254,4 +252,45 @@ export interface RegisterPayload {
 export interface LoginPayload {
   email: string;
   password: string;
+}
+
+export interface ContratoGranos {
+  id: number;
+  carga_id?: number | null;
+  numero_contrato: string;
+  fecha_inicio_contrato: string;
+  fecha_fin_contrato: string;
+  productor_id: string;
+  productor_nombre: string;
+  exportador_id: string;
+  exportador_nombre: string;
+  tipo_grano: string;
+  calidad_grano: string;
+  humedad_maxima_permitida: number;
+  impurezas_maximas_permitidas: number;
+  planta_procedencia_ruca: string;
+  planta_destino_ruca: string;
+  cantidad_total_kg: number;
+  precio_por_kg: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContratoGranosCreatePayload {
+  carga_id?: number | null;
+  numero_contrato: string;
+  fecha_inicio_contrato: string;
+  fecha_fin_contrato: string;
+  productor_id: string;
+  productor_nombre: string;
+  exportador_id: string;
+  exportador_nombre: string;
+  tipo_grano: string;
+  calidad_grano: string;
+  humedad_maxima_permitida: number;
+  impurezas_maximas_permitidas: number;
+  planta_procedencia_ruca: string;
+  planta_destino_ruca: string;
+  cantidad_total_kg: number;
+  precio_por_kg: number;
 }

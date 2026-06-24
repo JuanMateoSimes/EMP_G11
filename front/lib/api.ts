@@ -19,7 +19,9 @@ import type {
   Viaje,
   ViajeEstado,
   PresupuestoRequest,
-  PresupuestoResponse
+  PresupuestoResponse,
+  ContratoGranos,
+  ContratoGranosCreatePayload
 } from "@/lib/types";
 import { isRecord } from "@/lib/utils";
 
@@ -147,6 +149,17 @@ export const api = {
       return withFallback<EmpresaPyme>(
         () => apiFetch<EmpresaPyme>("/api/pymes/me", { method: "PUT", body: payload }),
         () => mockApi.pymes.update(payload)
+      );
+    },
+    dashboard() {
+      return withFallback<{
+        viajes_totales: number;
+        gastos_totales: number;
+        cuenta_verificada: boolean;
+        actividad_reciente: Array<{ fecha: string; tipo_carga: string; estado: string }>;
+      }>(
+        () => apiFetch("/api/pymes/dashboard"),
+        () => mockApi.pymes.dashboard()
       );
     }
   },
@@ -425,6 +438,26 @@ export const api = {
       return withFallback<Notificacion>(
         () => apiFetch<Notificacion>(`/api/notificaciones/${id}/leer`, { method: "PATCH" }),
         () => mockApi.notificaciones.read(id)
+      );
+    }
+  },
+  contratos: {
+    list() {
+      return withFallback<ContratoGranos[]>(
+        () => apiFetch<ContratoGranos[]>("/api/contratos"),
+        () => mockApi.contratos.list()
+      );
+    },
+    get(id: number) {
+      return withFallback<ContratoGranos>(
+        () => apiFetch<ContratoGranos>(`/api/contratos/${id}`),
+        () => mockApi.contratos.get(id)
+      );
+    },
+    create(payload: ContratoGranosCreatePayload) {
+      return withFallback<ContratoGranos>(
+        () => apiFetch<ContratoGranos>("/api/contratos", { method: "POST", body: payload }),
+        () => mockApi.contratos.create(payload)
       );
     }
   }

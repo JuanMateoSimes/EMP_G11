@@ -682,30 +682,36 @@ function CargaDetailCard({ carga }: { carga: Carga }) {
         <Info label="Peso" value={`${numberValue(carga.peso_kg)} kg / ${numberValue(carga.volumen_m3)} m3`} />
       </div>
       {/* Ventanas horarias y balanza */}
-      <div className="mt-4 grid gap-3 border-t border-line pt-4">
-        <p className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
-          <CalendarClock className="h-3.5 w-3.5" /> Logística operativa
-        </p>
-        <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
-          <Info label="Inicio carga" value={formatDate(carga.hora_inicio_carga)} />
-          <Info label="Fin carga" value={formatDate(carga.hora_fin_carga)} />
-          <Info label="Inicio descarga" value={formatDate(carga.hora_inicio_descarga)} />
-          <Info label="Fin descarga" value={formatDate(carga.hora_fin_descarga)} />
-        </div>
-        {carga.requiere_balanza && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
-            <p className="font-bold text-amber-800">⚖️ Requiere pesaje en balanza</p>
-            {carga.ubicacion_balanza && (
-              <p className="text-amber-700 mt-1">Ubicación: {carga.ubicacion_balanza}</p>
-            )}
-            {carga.hora_inicio_balanza && carga.hora_fin_balanza && (
-              <p className="text-amber-700 mt-0.5">
-                Horario: {formatDate(carga.hora_inicio_balanza)} – {formatDate(carga.hora_fin_balanza)}
+      {(carga.hora_inicio_carga || carga.hora_fin_carga || carga.hora_inicio_descarga || carga.hora_fin_descarga || carga.requiere_balanza) && (
+        <div className="mt-4 grid gap-3 border-t border-line pt-4">
+          {(carga.hora_inicio_carga || carga.hora_fin_carga || carga.hora_inicio_descarga || carga.hora_fin_descarga) && (
+            <>
+              <p className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
+                <CalendarClock className="h-3.5 w-3.5" /> Logística operativa
               </p>
-            )}
-          </div>
-        )}
-      </div>
+              <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+                {carga.hora_inicio_carga && <Info label="Inicio carga" value={formatDate(carga.hora_inicio_carga)} />}
+                {carga.hora_fin_carga && <Info label="Fin carga" value={formatDate(carga.hora_fin_carga)} />}
+                {carga.hora_inicio_descarga && <Info label="Inicio descarga" value={formatDate(carga.hora_inicio_descarga)} />}
+                {carga.hora_fin_descarga && <Info label="Fin descarga" value={formatDate(carga.hora_fin_descarga)} />}
+              </div>
+            </>
+          )}
+          {carga.requiere_balanza && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
+              <p className="font-bold text-amber-800">⚖️ Requiere pesaje en balanza</p>
+              {carga.ubicacion_balanza && (
+                <p className="text-amber-700 mt-1">Ubicación: {carga.ubicacion_balanza}</p>
+              )}
+              {carga.hora_inicio_balanza && carga.hora_fin_balanza && (
+                <p className="text-amber-700 mt-0.5">
+                  Horario: {formatDate(carga.hora_inicio_balanza)} – {formatDate(carga.hora_fin_balanza)}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </Card>
   );
 }

@@ -18,7 +18,9 @@ import type {
   Vehiculo,
   VehiculoEstado,
   Viaje,
-  ViajeEstado
+  ViajeEstado,
+  ContratoGranos,
+  ContratoGranosCreatePayload
 } from "@/lib/types";
 
 const STATE_KEY = "logexpress_mock_state_v1";
@@ -40,6 +42,7 @@ interface MockState {
   pagos: Pago[];
   calificaciones: Calificacion[];
   notificaciones: Notificacion[];
+  contratos: ContratoGranos[];
   counters: Record<string, number>;
 }
 
@@ -206,14 +209,12 @@ function seedState(): MockState {
       {
         id: 1,
         empresa_id: 1,
+        idsTiposAcoplados: [1, 2],
         titulo: "Pallets de alimentos secos",
         descripcion: "Mercaderia palletizada para supermercado regional.",
         tipo_mercaderia: "Alimentos",
         peso_kg: 7200,
         volumen_m3: 34,
-        requiere_refrigeracion: false,
-        requiere_rampa: true,
-        requiere_mantas: false,
         origen_direccion: "Av. Pellegrini 2010",
         origen_ciudad: "Rosario",
         origen_provincia: "Santa Fe",
@@ -249,14 +250,12 @@ function seedState(): MockState {
       {
         id: 2,
         empresa_id: 2,
+        idsTiposAcoplados: [2, 3],
         titulo: "Cajas de indumentaria",
         descripcion: "Bultos livianos, requiere cuidado de embalaje.",
         tipo_mercaderia: "Textil",
         peso_kg: 1800,
         volumen_m3: 22,
-        requiere_refrigeracion: false,
-        requiere_rampa: false,
-        requiere_mantas: true,
         origen_direccion: "Calle 47 880",
         origen_ciudad: "La Plata",
         origen_provincia: "Buenos Aires",
@@ -292,14 +291,12 @@ function seedState(): MockState {
       {
         id: 3,
         empresa_id: 1,
+        idsTiposAcoplados: [1, 4],
         titulo: "Insumos para deposito sur",
         descripcion: "Carga general, entrega coordinada en planta.",
         tipo_mercaderia: "Insumos",
         peso_kg: 5400,
         volumen_m3: 28,
-        requiere_refrigeracion: false,
-        requiere_rampa: false,
-        requiere_mantas: false,
         origen_direccion: "Parque Industrial Alvear",
         origen_ciudad: "Rosario",
         origen_provincia: "Santa Fe",
@@ -410,6 +407,7 @@ function seedState(): MockState {
         created_at: stamp
       }
     ],
+    contratos: [],
     counters: {
       users: 5,
       pymes: 2,
@@ -422,7 +420,8 @@ function seedState(): MockState {
       tracking: 2,
       pagos: 0,
       calificaciones: 0,
-      notificaciones: 1
+      notificaciones: 1,
+      contratos: 0
     }
   };
 }
@@ -634,6 +633,34 @@ export const mockApi = {
         Object.assign(pyme, payload, { updated_at: nowIso() });
         return pyme;
       });
+    },
+    dashboard() {
+      const state = readState();
+      const pyme = requirePyme(state);
+      const viajes = state.viajes.filter((v) => v.empresa_id === pyme.id);
+      const pagos = state.pagos.filter((p) => p.empresa_id === pyme.id);
+      const cargas = state.cargas.filter((c) => c.empresa_id === pyme.id);
+
+      const viajes_totales = viajes.length;
+      const gastos_totales = pagos.reduce((sum, p) => sum + Number(p.monto_total), 0);
+      const cuenta_verificada = pyme.verificada;
+
+      // Recent activities: last 5 cargas sorted by updated_at or created_at desc
+      const sortedCargas = [...cargas].sort(
+        (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      );
+      const actividad_reciente = sortedCargas.slice(0, 5).map((c) => ({
+        fecha: c.updated_at,
+        tipo_carga: c.tipo_mercaderia,
+        estado: c.estado
+      }));
+
+      return {
+        viajes_totales,
+        gastos_totales,
+        cuenta_verificada,
+        actividad_reciente
+      };
     }
   },
   transportistas: {
@@ -1175,6 +1202,60 @@ export const mockApi = {
         if (!notification) throw new ApiError("Notificacion inexistente.", { status: 404 });
         notification.leida = true;
         return notification;
+      });
+    }
+  },
+  contratos: {
+    list(): ContratoGranos[] {
+      const state = readState();
+      const user = requireUser(state);
+      if (user.rol === "ADMIN") {
+        return state.contratos;
+      }
+      const pyme = state.pymes.find((item) => item.user_id === user.id);
+      if (!pyme) return [];
+      return state.contratos.filter((item) => {
+        if (!item.carga_id) return true;
+        const carga = state.cargas.find((c) => c.id === item.carga_id);
+        return carga?.empresa_id === pyme.id;
+      });
+    },
+    get(id: number): ContratoGranos {
+      const state = readState();
+      const contrato = state.contratos.find((item) => item.id === id);
+      if (!contrato) throw new ApiError("Contrato no encontrado.", { status: 404 });
+      return contrato;
+    },
+    create(payload: ContratoGranosCreatePayload): ContratoGranos {
+      return mutate((state) => {
+        const user = requireUser(state);
+        if (user.rol !== "PYME") {
+          throw new ApiError("Accion restringida a PyMEs.", { status: 403 });
+        }
+        const pyme = state.pymes.find((item) => item.user_id === user.id);
+        if (!pyme) throw new ApiError("Perfil PyME no configurado.", { status: 400 });
+
+        const duplicate = state.contratos.some((item) => item.numero_contrato === payload.numero_contrato);
+        if (duplicate) {
+          throw new ApiError("El número de contrato ya está registrado.", { status: 409 });
+        }
+
+        if (payload.carga_id) {
+          const carga = state.cargas.find((c) => c.id === payload.carga_id);
+          if (!carga) throw new ApiError("La carga asociada no existe.", { status: 404 });
+          if (carga.empresa_id !== pyme.id) {
+            throw new ApiError("No tienes permisos sobre la carga asociada.", { status: 403 });
+          }
+        }
+
+        const contrato: ContratoGranos = {
+          id: nextId(state, "contratos"),
+          ...payload,
+          created_at: nowIso(),
+          updated_at: nowIso()
+        };
+        state.contratos.unshift(contrato);
+        return contrato;
       });
     }
   }

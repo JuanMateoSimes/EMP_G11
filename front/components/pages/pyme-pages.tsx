@@ -38,16 +38,25 @@ const pymeSchema = z.object({
   provincia: z.string().min(2, "Ingresa provincia")
 });
 
+const imagenesAcoplados = [
+  { id: 1, nombre: "Batea", imagen: "https://i.imgur.com/KmmClLu.png" },
+  { id: 2, nombre: "Semirremolque", imagen: "https://i.imgur.com/fUnL2CF.png" },
+  { id: 3, nombre: "Sider", imagen: "https://i.imgur.com/JFHczdM.png" },
+  { id: 4, nombre: "Equipo", imagen: "https://i.imgur.com/UMkk15q.png" },
+  { id: 5, nombre: "Tolva", imagen: "https://i.imgur.com/UbJRJjz.png" },
+  { id: 6, nombre: "Bitren", imagen: "https://i.imgur.com/3kZfptL.png" },
+  { id: 7, nombre: "Carreton", imagen: "https://i.imgur.com/rJXPRGw.png" },
+  { id: 8, nombre: "PortaCont", imagen: "https://i.imgur.com/VNQNsnN.png" }
+];
+
 const cargaSchema = z
   .object({
     titulo: z.string().min(2, "Ingresa un titulo"),
+    idsTiposAcoplados: z.array(z.number()).min(1, "Debes seleccionar al menos un tipo de acoplado"),
     descripcion: z.string().optional(),
     tipo_mercaderia: z.string().min(2, "Ingresa el tipo de mercaderia"),
     peso_kg: z.coerce.number().positive("Debe ser mayor a cero"),
     volumen_m3: z.coerce.number().positive("Debe ser mayor a cero"),
-    requiere_refrigeracion: z.boolean().default(false),
-    requiere_rampa: z.boolean().default(false),
-    requiere_mantas: z.boolean().default(false),
     origen_direccion: z.string().min(2, "Ingresa origen"),
     origen_ciudad: z.string().min(2, "Ingresa ciudad"),
     origen_provincia: z.string().min(2, "Ingresa provincia"),
@@ -64,10 +73,12 @@ const cargaSchema = z
     tarifa: z.coerce.number().positive("Debe ser mayor a cero"),
     tarifa_base_ton_km: z.coerce.number().default(0),
     incluyeIVA: z.boolean().default(false),
-    hora_inicio_carga: z.string().min(1, "Ingresa hora inicio de carga"),
-    hora_fin_carga: z.string().min(1, "Ingresa hora fin de carga"),
-    hora_inicio_descarga: z.string().min(1, "Ingresa hora inicio de descarga"),
-    hora_fin_descarga: z.string().min(1, "Ingresa hora fin de descarga"),
+    requiere_ventana_carga: z.boolean().default(false),
+    hora_inicio_carga: z.string().optional(),
+    hora_fin_carga: z.string().optional(),
+    requiere_ventana_descarga: z.boolean().default(false),
+    hora_inicio_descarga: z.string().optional(),
+    hora_fin_descarga: z.string().optional(),
     requiere_balanza: z.boolean().default(false),
     ubicacion_balanza: z.string().optional(),
     hora_inicio_balanza: z.string().optional(),
@@ -77,14 +88,46 @@ const cargaSchema = z
     message: "La entrega no puede ser anterior al retiro",
     path: ["fecha_entrega_deseada"]
   })
-  .refine((data) => !data.hora_fin_carga || data.hora_fin_carga >= data.hora_inicio_carga, {
-    message: "Fin de carga debe ser posterior a inicio",
-    path: ["hora_fin_carga"]
-  })
-  .refine((data) => !data.hora_fin_descarga || data.hora_fin_descarga >= data.hora_inicio_descarga, {
-    message: "Fin de descarga debe ser posterior a inicio",
-    path: ["hora_fin_descarga"]
-  })
+  .refine(
+    (data) =>
+      !data.requiere_ventana_carga ||
+      (data.hora_inicio_carga && data.hora_fin_carga),
+    {
+      message: "Completa las horas de la ventana de carga",
+      path: ["hora_inicio_carga"]
+    }
+  )
+  .refine(
+    (data) =>
+      !data.requiere_ventana_carga ||
+      !data.hora_inicio_carga ||
+      !data.hora_fin_carga ||
+      data.hora_fin_carga >= data.hora_inicio_carga,
+    {
+      message: "Fin de carga debe ser posterior a inicio",
+      path: ["hora_fin_carga"]
+    }
+  )
+  .refine(
+    (data) =>
+      !data.requiere_ventana_descarga ||
+      (data.hora_inicio_descarga && data.hora_fin_descarga),
+    {
+      message: "Completa las horas de la ventana de descarga",
+      path: ["hora_inicio_descarga"]
+    }
+  )
+  .refine(
+    (data) =>
+      !data.requiere_ventana_descarga ||
+      !data.hora_inicio_descarga ||
+      !data.hora_fin_descarga ||
+      data.hora_fin_descarga >= data.hora_inicio_descarga,
+    {
+      message: "Fin de descarga debe ser posterior a inicio",
+      path: ["hora_fin_descarga"]
+    }
+  )
   .refine(
     (data) =>
       !data.requiere_balanza ||
@@ -107,9 +150,9 @@ type RatingForm = z.infer<typeof ratingSchema>;
 export function PymeDashboardPage() {
   const resource = useResource(async () => {
     const profile = await loadOptionalProfile();
-    if (!profile) return { profile, cargas: [] as Carga[], viajes: [] as Viaje[] };
-    const [cargas, viajes] = await Promise.all([api.cargas.mine(), api.viajes.mine()]);
-    return { profile, cargas, viajes };
+    if (!profile) return { profile, dashboard: null };
+    const dashboard = await api.pymes.dashboard();
+    return { profile, dashboard };
   }, []);
 
   return (
@@ -119,67 +162,91 @@ export function PymeDashboardPage() {
       {!resource.loading && resource.data ? (
         resource.data.profile ? (
           <div>
-            <SectionTitle
-              title="Dashboard PyME"
-              action={
-                <Link
-                  href="/pyme/cargas/nueva"
-                  className="inline-flex min-h-[38px] items-center gap-2 rounded-md bg-navy px-4 py-2 text-sm font-semibold text-white"
-                >
-                  <PackagePlus className="h-4 w-4" /> Publicar carga
-                </Link>
-              }
-            />
-            <div className="grid gap-4 md:grid-cols-4">
-              <StatCard label="Cargas publicadas" value={resource.data.cargas.length} icon={Package} />
-              <StatCard
-                label="Con ofertas"
-                value={resource.data.cargas.filter((item) => item.estado === "CON_OFERTAS").length}
-                icon={ClipboardCheck}
-              />
-              <StatCard label="Viajes activos" value={resource.data.viajes.filter((item) => item.estado !== "ENTREGADO").length} icon={Route} />
-              <StatCard
-                label="Total referencia"
-                value={money(resource.data.cargas.reduce((sum, item) => sum + numberValue(item.precio_referencia), 0))}
-                icon={CreditCard}
-              />
+            {/* Header de Cuenta */}
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-line pb-4">
+              <div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <h1 className="text-2xl font-black text-slate-950">{resource.data.profile.razon_social}</h1>
+                  {resource.data.dashboard?.cuenta_verificada && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700 border border-blue-200">
+                      <svg className="h-3.5 w-3.5 text-blue-600 fill-current" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      Cuenta Verificada
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-sm text-slate-500 font-semibold">{resource.data.profile.rubro} &bull; {resource.data.profile.ciudad}, {resource.data.profile.provincia}</p>
+              </div>
+              <Link
+                href="/pyme/cargas/nueva"
+                className="inline-flex min-h-[38px] items-center gap-2 rounded-md bg-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0d2949] self-start sm:self-auto"
+              >
+                <PackagePlus className="h-4 w-4" /> Publicar carga
+              </Link>
             </div>
-            <div className="mt-6 grid gap-4 lg:grid-cols-[1fr,420px]">
-              <Card className="p-4">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="font-black text-slate-950">Ultimas cargas</h2>
-                  <Link href="/pyme/cargas" className="text-sm font-bold text-navy">
-                    Ver todas
-                  </Link>
+
+            {/* Tarjetas de Métricas */}
+            <div className="grid gap-4 md:grid-cols-2 mb-6">
+              <div className="bg-white border border-line rounded-xl p-6 shadow-sm flex items-center justify-between transition hover:shadow-md">
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Viajes Totales</p>
+                  <p className="text-3xl font-black text-slate-950 mt-2">{resource.data.dashboard?.viajes_totales ?? 0}</p>
                 </div>
-                <div className="space-y-3">
-                  {resource.data.cargas.slice(0, 3).map((carga) => (
-                    <CargaCard key={carga.id} carga={carga} href={`/pyme/cargas/${carga.id}`} />
-                  ))}
-                  {resource.data.cargas.length === 0 ? (
-                    <EmptyState title="Sin cargas" text="Publica tu primera carga para recibir ofertas." />
-                  ) : null}
+                <div className="h-12 w-12 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-100">
+                  <Route className="h-6 w-6" />
                 </div>
-              </Card>
-              <div className="space-y-4">
-                <MapPreview
-                  title="Cargas y tracking"
-                  subtitle={resource.data.viajes[0] ? `Viaje #${resource.data.viajes[0].id}` : "Sin viajes activos"}
-                  points={[
-                    { label: "Origen" },
-                    { label: "Unidad", active: true },
-                    { label: "Destino" }
-                  ]}
-                />
-                <Card className="p-4">
-                  <p className="text-xs font-bold uppercase text-slate-400">Perfil</p>
-                  <h2 className="mt-1 font-black text-slate-950">{resource.data.profile.razon_social}</h2>
-                  <p className="text-sm text-slate-500">
-                    {resource.data.profile.rubro} - {resource.data.profile.ciudad}, {resource.data.profile.provincia}
-                  </p>
-                </Card>
+              </div>
+              <div className="bg-white border border-line rounded-xl p-6 shadow-sm flex items-center justify-between transition hover:shadow-md">
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Gastos Totales</p>
+                  <p className="text-3xl font-black text-slate-950 mt-2">{money(resource.data.dashboard?.gastos_totales ?? 0)}</p>
+                </div>
+                <div className="h-12 w-12 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-100">
+                  <CreditCard className="h-6 w-6" />
+                </div>
               </div>
             </div>
+
+            {/* Sección de Actividad Reciente */}
+            <Card className="p-5">
+              <div className="mb-4 flex items-center justify-between border-b border-line pb-3">
+                <div>
+                  <h2 className="text-lg font-black text-slate-950">Actividad Reciente</h2>
+                  <p className="text-xs text-slate-500">Últimos movimientos de tus cargas y viajes</p>
+                </div>
+              </div>
+              {(!resource.data.dashboard?.actividad_reciente || resource.data.dashboard.actividad_reciente.length === 0) ? (
+                <EmptyState title="Sin actividad" text="No registraste ningún movimiento en la plataforma todavía." />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-line text-xs font-bold uppercase text-slate-400">
+                        <th className="py-3 px-3">Fecha</th>
+                        <th className="py-3 px-3">Tipo de Carga</th>
+                        <th className="py-3 px-3">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line text-sm">
+                      {resource.data.dashboard.actividad_reciente.map((act, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-3 px-3 font-semibold text-slate-500">
+                            {act.fecha ? formatDate(act.fecha) : "Sin fecha"}
+                          </td>
+                          <td className="py-3 px-3 font-bold text-slate-800">
+                            {act.tipo_carga}
+                          </td>
+                          <td className="py-3 px-3">
+                            <StatusBadge value={act.estado} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
           </div>
         ) : (
           <ProfileSetup onDone={resource.reload} />
@@ -242,13 +309,11 @@ export function NuevaCargaPage() {
     resolver: zodResolver(cargaSchema),
     defaultValues: {
       titulo: "",
+      idsTiposAcoplados: [],
       descripcion: "",
       tipo_mercaderia: "",
       peso_kg: 1000,
       volumen_m3: 10,
-      requiere_refrigeracion: false,
-      requiere_rampa: false,
-      requiere_mantas: false,
       origen_direccion: "",
       origen_ciudad: "",
       origen_provincia: "",
@@ -265,8 +330,10 @@ export function NuevaCargaPage() {
       tarifa: 0,
       tarifa_base_ton_km: 0,
       incluyeIVA: false,
+      requiere_ventana_carga: false,
       hora_inicio_carga: "",
       hora_fin_carga: "",
+      requiere_ventana_descarga: false,
       hora_inicio_descarga: "",
       hora_fin_descarga: "",
       requiere_balanza: false,
@@ -313,11 +380,10 @@ export function NuevaCargaPage() {
         "titulo",
         "tipo_mercaderia",
         "descripcion",
-        "requiere_refrigeracion",
-        "requiere_rampa",
-        "requiere_mantas",
+        "requiere_ventana_carga",
         "hora_inicio_carga",
         "hora_fin_carga",
+        "requiere_ventana_descarga",
         "hora_inicio_descarga",
         "hora_fin_descarga",
         "requiere_balanza",
@@ -339,6 +405,13 @@ export function NuevaCargaPage() {
         "peso_kg",
         "volumen_m3"
       ];
+    } else if (step === 3) {
+      fieldsToValidate = [
+        "tarifa",
+        "idTipoTarifa",
+        "nombreTipoTarifa",
+        "incluyeIVA"
+      ];
     }
     const isStepValid = await form.trigger(fieldsToValidate);
     if (isStepValid) {
@@ -352,16 +425,17 @@ export function NuevaCargaPage() {
     try {
       const carga = await api.cargas.create({
         ...values,
+        idsTiposAcoplados: values.idsTiposAcoplados,
         descripcion: values.descripcion || null,
         fecha_retiro_deseada: isoFromInput(values.fecha_retiro_deseada),
         fecha_entrega_deseada: isoFromInput(values.fecha_entrega_deseada),
         precio_referencia: values.tarifa,
         distancia_km: Number(values.cantidadKm),
         tarifa_base_ton_km: Number(values.tarifa_base_ton_km || 0),
-        hora_inicio_carga: isoFromInput(values.hora_inicio_carga),
-        hora_fin_carga: isoFromInput(values.hora_fin_carga),
-        hora_inicio_descarga: isoFromInput(values.hora_inicio_descarga),
-        hora_fin_descarga: isoFromInput(values.hora_fin_descarga),
+        hora_inicio_carga: values.requiere_ventana_carga && values.hora_inicio_carga ? isoFromInput(values.hora_inicio_carga) : null,
+        hora_fin_carga: values.requiere_ventana_carga && values.hora_fin_carga ? isoFromInput(values.hora_fin_carga) : null,
+        hora_inicio_descarga: values.requiere_ventana_descarga && values.hora_inicio_descarga ? isoFromInput(values.hora_inicio_descarga) : null,
+        hora_fin_descarga: values.requiere_ventana_descarga && values.hora_fin_descarga ? isoFromInput(values.hora_fin_descarga) : null,
         requiere_balanza: values.requiere_balanza,
         ubicacion_balanza: values.requiere_balanza ? (values.ubicacion_balanza || null) : null,
         hora_inicio_balanza: values.requiere_balanza && values.hora_inicio_balanza ? isoFromInput(values.hora_inicio_balanza) : null,
@@ -418,6 +492,17 @@ export function NuevaCargaPage() {
             Tarifas e IVA
           </span>
         </div>
+        <div className="h-0.5 flex-1 bg-line mx-4" />
+        <div className="flex items-center gap-3">
+          <div className={`grid h-8 w-8 place-items-center rounded-full text-xs font-black shadow-sm ${
+            step >= 4 ? "bg-navy text-white" : "bg-slate-100 text-slate-400"
+          }`}>
+            4
+          </div>
+          <span className={`text-sm font-bold ${step === 4 ? "text-navy" : "text-slate-400"}`}>
+            Acoplados
+          </span>
+        </div>
       </div>
 
       <Card className="p-5">
@@ -429,52 +514,78 @@ export function NuevaCargaPage() {
                 <FormInput label="Tipo de mercaderia" error={form.formState.errors.tipo_mercaderia?.message} {...form.register("tipo_mercaderia")} />
               </div>
               <FormTextarea label="Descripcion" error={form.formState.errors.descripcion?.message} {...form.register("descripcion")} />
-              <div className="grid gap-3 md:grid-cols-3">
-                <CheckboxField label="Refrigeracion" {...form.register("requiere_refrigeracion")} />
-                <CheckboxField label="Rampa" {...form.register("requiere_rampa")} />
-                <CheckboxField label="Mantas" {...form.register("requiere_mantas")} />
-              </div>
-
               {/* Ventana Horaria de Carga */}
-              <div className="rounded-lg border border-line bg-slate-50 p-4 grid gap-3">
-                <p className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                  <CalendarClock className="h-4 w-4 text-navy" /> Ventana horaria de carga
-                </p>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <FormInput
-                    label="Inicio de carga"
-                    type="datetime-local"
-                    error={form.formState.errors.hora_inicio_carga?.message}
-                    {...form.register("hora_inicio_carga")}
-                  />
-                  <FormInput
-                    label="Fin de carga"
-                    type="datetime-local"
-                    error={form.formState.errors.hora_fin_carga?.message}
-                    {...form.register("hora_fin_carga")}
-                  />
+              <div className="rounded-lg border border-line p-4 grid gap-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-slate-950 flex items-center gap-2">
+                      <CalendarClock className="h-4 w-4 text-navy" /> ¿Coordinar ventana horaria de carga?
+                    </p>
+                    <p className="text-xs text-slate-500">Define un rango de tiempo específico para la recepción del camión en el origen</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={form.watch("requiere_ventana_carga")}
+                      onChange={(e) => form.setValue("requiere_ventana_carga", e.target.checked, { shouldValidate: true })}
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                  </label>
                 </div>
+                {form.watch("requiere_ventana_carga") && (
+                  <div className="grid gap-3 border-t border-line pt-3 md:grid-cols-2">
+                    <FormInput
+                      label="Inicio de carga"
+                      type="datetime-local"
+                      error={form.formState.errors.hora_inicio_carga?.message}
+                      {...form.register("hora_inicio_carga")}
+                    />
+                    <FormInput
+                      label="Fin de carga"
+                      type="datetime-local"
+                      error={form.formState.errors.hora_fin_carga?.message}
+                      {...form.register("hora_fin_carga")}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Ventana Horaria de Descarga */}
-              <div className="rounded-lg border border-line bg-slate-50 p-4 grid gap-3">
-                <p className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                  <CalendarClock className="h-4 w-4 text-navy" /> Ventana horaria de descarga
-                </p>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <FormInput
-                    label="Inicio de descarga"
-                    type="datetime-local"
-                    error={form.formState.errors.hora_inicio_descarga?.message}
-                    {...form.register("hora_inicio_descarga")}
-                  />
-                  <FormInput
-                    label="Fin de descarga"
-                    type="datetime-local"
-                    error={form.formState.errors.hora_fin_descarga?.message}
-                    {...form.register("hora_fin_descarga")}
-                  />
+              <div className="rounded-lg border border-line p-4 grid gap-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-slate-950 flex items-center gap-2">
+                      <CalendarClock className="h-4 w-4 text-navy" /> ¿Coordinar ventana horaria de descarga?
+                    </p>
+                    <p className="text-xs text-slate-500">Define un rango de tiempo específico para la recepción del camión en el destino</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={form.watch("requiere_ventana_descarga")}
+                      onChange={(e) => form.setValue("requiere_ventana_descarga", e.target.checked, { shouldValidate: true })}
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                  </label>
                 </div>
+                {form.watch("requiere_ventana_descarga") && (
+                  <div className="grid gap-3 border-t border-line pt-3 md:grid-cols-2">
+                    <FormInput
+                      label="Inicio de descarga"
+                      type="datetime-local"
+                      error={form.formState.errors.hora_inicio_descarga?.message}
+                      {...form.register("hora_inicio_descarga")}
+                    />
+                    <FormInput
+                      label="Fin de descarga"
+                      type="datetime-local"
+                      error={form.formState.errors.hora_fin_descarga?.message}
+                      {...form.register("hora_fin_descarga")}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Balanza */}
@@ -689,6 +800,64 @@ export function NuevaCargaPage() {
 
               <div className="flex justify-between mt-4">
                 <Button type="button" variant="secondary" onClick={() => setStep(2)}>
+                  Atrás
+                </Button>
+                <Button type="button" onClick={nextStep}>
+                  Siguiente <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="grid gap-4">
+              <div>
+                <p className="text-sm font-bold text-slate-950 mb-1">Tipos de Acoplados Admitidos</p>
+                <p className="text-xs text-slate-500 mb-4">Selecciona uno o más tipos de camiones/acoplados permitidos para transportar tu carga.</p>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {imagenesAcoplados.map((acoplado) => {
+                    const current = form.watch("idsTiposAcoplados") || [];
+                    const isSelected = current.includes(acoplado.id);
+                    return (
+                      <button
+                        key={acoplado.id}
+                        type="button"
+                        onClick={() => {
+                          const next = isSelected
+                            ? current.filter((id) => id !== acoplado.id)
+                            : [...current, acoplado.id];
+                          form.setValue("idsTiposAcoplados", next, { shouldValidate: true });
+                        }}
+                        className={`flex flex-col items-center justify-between p-4 rounded-xl border-2 transition-all ${
+                          isSelected
+                            ? "border-navy bg-blue-50/50 shadow-sm"
+                            : "border-line bg-white hover:border-slate-300"
+                        }`}
+                      >
+                        <div className="h-20 w-full flex items-center justify-center mb-2">
+                          <img
+                            src={acoplado.imagen}
+                            alt={acoplado.nombre}
+                            className="max-h-full max-w-full object-contain"
+                          />
+                        </div>
+                        <span className={`text-xs font-bold ${isSelected ? "text-navy" : "text-slate-600"}`}>
+                          {acoplado.nombre}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {form.formState.errors.idsTiposAcoplados && (
+                  <p className="text-xs text-red-500 font-semibold mt-2">
+                    {form.formState.errors.idsTiposAcoplados.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex justify-between mt-4">
+                <Button type="button" variant="secondary" onClick={() => setStep(3)}>
                   Atrás
                 </Button>
                 <Button type="submit" loading={form.formState.isSubmitting}>
@@ -1071,30 +1240,36 @@ function CargaSummary({ carga }: { carga: Carga }) {
         <Info label="Retiro" value={formatDate(carga.fecha_retiro_deseada)} />
       </div>
       {/* Ventanas horarias y balanza */}
-      <div className="mt-4 grid gap-3 border-t border-line pt-4">
-        <p className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
-          <CalendarClock className="h-3.5 w-3.5" /> Logística operativa
-        </p>
-        <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
-          <Info label="Inicio carga" value={formatDate(carga.hora_inicio_carga)} />
-          <Info label="Fin carga" value={formatDate(carga.hora_fin_carga)} />
-          <Info label="Inicio descarga" value={formatDate(carga.hora_inicio_descarga)} />
-          <Info label="Fin descarga" value={formatDate(carga.hora_fin_descarga)} />
-        </div>
-        {carga.requiere_balanza && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
-            <p className="font-bold text-amber-800">⚖️ Requiere pesaje en balanza</p>
-            {carga.ubicacion_balanza && (
-              <p className="text-amber-700 mt-1">Ubicacion: {carga.ubicacion_balanza}</p>
-            )}
-            {carga.hora_inicio_balanza && carga.hora_fin_balanza && (
-              <p className="text-amber-700 mt-0.5">
-                Horario: {formatDate(carga.hora_inicio_balanza)} – {formatDate(carga.hora_fin_balanza)}
+      {(carga.hora_inicio_carga || carga.hora_fin_carga || carga.hora_inicio_descarga || carga.hora_fin_descarga || carga.requiere_balanza) && (
+        <div className="mt-4 grid gap-3 border-t border-line pt-4">
+          {(carga.hora_inicio_carga || carga.hora_fin_carga || carga.hora_inicio_descarga || carga.hora_fin_descarga) && (
+            <>
+              <p className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
+                <CalendarClock className="h-3.5 w-3.5" /> Logística operativa
               </p>
-            )}
-          </div>
-        )}
-      </div>
+              <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+                {carga.hora_inicio_carga && <Info label="Inicio carga" value={formatDate(carga.hora_inicio_carga)} />}
+                {carga.hora_fin_carga && <Info label="Fin carga" value={formatDate(carga.hora_fin_carga)} />}
+                {carga.hora_inicio_descarga && <Info label="Inicio descarga" value={formatDate(carga.hora_inicio_descarga)} />}
+                {carga.hora_fin_descarga && <Info label="Fin descarga" value={formatDate(carga.hora_fin_descarga)} />}
+              </div>
+            </>
+          )}
+          {carga.requiere_balanza && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
+              <p className="font-bold text-amber-800">⚖️ Requiere pesaje en balanza</p>
+              {carga.ubicacion_balanza && (
+                <p className="text-amber-700 mt-1">Ubicacion: {carga.ubicacion_balanza}</p>
+              )}
+              {carga.hora_inicio_balanza && carga.hora_fin_balanza && (
+                <p className="text-amber-700 mt-0.5">
+                  Horario: {formatDate(carga.hora_inicio_balanza)} – {formatDate(carga.hora_fin_balanza)}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </Card>
   );
 }

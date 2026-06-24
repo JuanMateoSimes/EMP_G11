@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_roles
 from app.models.enums import UserRole
 from app.models.models import EmpresaPyme, User
-from app.schemas.schemas import EmpresaPymeCreate, EmpresaPymeResponse, EmpresaPymeUpdate
+from app.schemas.schemas import EmpresaPymeCreate, EmpresaPymeResponse, EmpresaPymeUpdate, PymeDashboardResponse
 
 router = APIRouter(prefix="/api/pymes", tags=["PyMEs"])
 
@@ -56,6 +56,50 @@ def update_my_pyme(
     db.commit()
     db.refresh(pyme)
     return pyme
+
+
+@router.get("/dashboard", response_model=PymeDashboardResponse)
+def get_pyme_dashboard(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.PYME)),
+) -> dict:
+    from app.models.models import Viaje, Pago, Carga
+    
+    pyme = db.scalar(select(EmpresaPyme).where(EmpresaPyme.user_id == current_user.id))
+    if pyme is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="La PyME no existe")
+        
+    viajes_totales = db.scalar(
+        select(func.count(Viaje.id)).where(Viaje.empresa_id == pyme.id)
+    ) or 0
+    
+    gastos_totales = db.scalar(
+        select(func.sum(Pago.monto_total)).where(Pago.empresa_id == pyme.id)
+    ) or 0.0
+    
+    cuenta_verificada = pyme.verificada
+    
+    cargas_recientes = db.scalars(
+        select(Carga)
+        .where(Carga.empresa_id == pyme.id)
+        .order_by(Carga.updated_at.desc())
+        .limit(5)
+    ).all()
+    
+    actividad_reciente = []
+    for c in cargas_recientes:
+        actividad_reciente.append({
+            "fecha": c.updated_at,
+            "tipo_carga": c.tipo_mercaderia,
+            "estado": c.estado
+        })
+        
+    return {
+        "viajes_totales": viajes_totales,
+        "gastos_totales": float(gastos_totales),
+        "cuenta_verificada": cuenta_verificada,
+        "actividad_reciente": actividad_reciente
+    }
 
 
 @router.patch("/{pyme_id}/verificar", response_model=EmpresaPymeResponse)

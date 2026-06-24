@@ -225,13 +225,11 @@ class PresupuestoResponse(BaseModel):
 
 class CargaCreate(BaseModel):
     titulo: str = Field(min_length=2, max_length=180)
+    idsTiposAcoplados: list[int] = Field(..., min_length=1, description="IDs de los tipos de acoplados admitidos")
     descripcion: str | None = None
     tipo_mercaderia: str = Field(min_length=2, max_length=150)
     peso_kg: float = Field(gt=0)
     volumen_m3: float = Field(gt=0)
-    requiere_refrigeracion: bool = False
-    requiere_rampa: bool = False
-    requiere_mantas: bool = False
     origen_direccion: str = Field(min_length=2, max_length=255)
     origen_ciudad: str = Field(min_length=2, max_length=120)
     origen_provincia: str = Field(min_length=2, max_length=120)
@@ -252,10 +250,10 @@ class CargaCreate(BaseModel):
     tarifa: float = Field(gt=0)
     tarifa_base_ton_km: float | None = None
     incluyeIVA: bool = False
-    hora_inicio_carga: datetime
-    hora_fin_carga: datetime
-    hora_inicio_descarga: datetime
-    hora_fin_descarga: datetime
+    hora_inicio_carga: datetime | None = None
+    hora_fin_carga: datetime | None = None
+    hora_inicio_descarga: datetime | None = None
+    hora_fin_descarga: datetime | None = None
     requiere_balanza: bool = False
     ubicacion_balanza: str | None = None
     hora_inicio_balanza: datetime | None = None
@@ -277,12 +275,14 @@ class CargaCreate(BaseModel):
             raise ValueError("La fecha de entrega no puede ser anterior a la fecha de retiro")
         
         # Validar tiempos de carga
-        if self.hora_fin_carga <= self.hora_inicio_carga:
-            raise ValueError("La hora de fin de carga debe ser posterior a la de inicio")
+        if self.hora_inicio_carga is not None and self.hora_fin_carga is not None:
+            if self.hora_fin_carga <= self.hora_inicio_carga:
+                raise ValueError("La hora de fin de carga debe ser posterior a la de inicio")
             
         # Validar tiempos de descarga
-        if self.hora_fin_descarga <= self.hora_inicio_descarga:
-            raise ValueError("La hora de fin de descarga debe ser posterior a la de inicio")
+        if self.hora_inicio_descarga is not None and self.hora_fin_descarga is not None:
+            if self.hora_fin_descarga <= self.hora_inicio_descarga:
+                raise ValueError("La hora de fin de descarga debe ser posterior a la de inicio")
             
         # Validar balanza
         if self.requiere_balanza:
@@ -298,15 +298,13 @@ class CargaCreate(BaseModel):
 
 class CargaUpdate(BaseModel):
     titulo: str | None = Field(default=None, min_length=2, max_length=180)
+    idsTiposAcoplados: list[int] | None = None
     descripcion: str | None = None
     tipo_mercaderia: str | None = Field(default=None, min_length=2, max_length=150)
     peso_kg: float | None = Field(default=None, gt=0)
     volumen_m3: float | None = Field(default=None, gt=0)
     distancia_km: float | None = Field(default=None, gt=0)
     tarifa_base_ton_km: float | None = Field(default=None, gt=0)
-    requiere_refrigeracion: bool | None = None
-    requiere_rampa: bool | None = None
-    requiere_mantas: bool | None = None
     origen_direccion: str | None = Field(default=None, min_length=2, max_length=255)
     origen_ciudad: str | None = Field(default=None, min_length=2, max_length=120)
     origen_provincia: str | None = Field(default=None, min_length=2, max_length=120)
@@ -343,14 +341,12 @@ class CargaUpdate(BaseModel):
 class CargaResponse(ORMModel):
     id: int
     empresa_id: int
+    idsTiposAcoplados: list[int]
     titulo: str
     descripcion: str | None
     tipo_mercaderia: str
     peso_kg: float
     volumen_m3: float
-    requiere_refrigeracion: bool
-    requiere_rampa: bool
-    requiere_mantas: bool
     origen_direccion: str
     origen_ciudad: str
     origen_provincia: str
@@ -371,10 +367,10 @@ class CargaResponse(ORMModel):
     tarifa: float
     tarifa_base_ton_km: float
     incluyeIVA: bool
-    hora_inicio_carga: datetime
-    hora_fin_carga: datetime
-    hora_inicio_descarga: datetime
-    hora_fin_descarga: datetime
+    hora_inicio_carga: datetime | None
+    hora_fin_carga: datetime | None
+    hora_inicio_descarga: datetime | None
+    hora_fin_descarga: datetime | None
     requiere_balanza: bool
     ubicacion_balanza: str | None
     hora_inicio_balanza: datetime | None
@@ -499,3 +495,63 @@ class NotificacionResponse(ORMModel):
     tipo: NotificacionTipo
     leida: bool
     created_at: datetime
+
+
+class ActividadReciente(BaseModel):
+    fecha: datetime | None = None
+    tipo_carga: str
+    estado: str
+
+
+class PymeDashboardResponse(BaseModel):
+    viajes_totales: int
+    gastos_totales: float
+    cuenta_verificada: bool
+    actividad_reciente: list[ActividadReciente]
+
+
+class ContratoGranosCreate(BaseModel):
+    carga_id: int | None = None
+    numero_contrato: str = Field(..., min_length=1, max_length=100)
+    fecha_inicio_contrato: datetime
+    fecha_fin_contrato: datetime
+    productor_id: str = Field(..., min_length=1, max_length=50)
+    productor_nombre: str = Field(..., min_length=1, max_length=255)
+    exportador_id: str = Field(..., min_length=1, max_length=50)
+    exportador_nombre: str = Field(..., min_length=1, max_length=255)
+    tipo_grano: str = Field(..., min_length=1, max_length=100)
+    calidad_grano: str = Field(..., min_length=1, max_length=100)
+    humedad_maxima_permitida: float = Field(..., ge=0.0, le=100.0)
+    impurezas_maximas_permitidas: float = Field(..., ge=0.0, le=100.0)
+    planta_procedencia_ruca: str = Field(..., min_length=1, max_length=100)
+    planta_destino_ruca: str = Field(..., min_length=1, max_length=100)
+    cantidad_total_kg: float = Field(..., gt=0.0)
+    precio_por_kg: float = Field(..., gt=0.0)
+
+    @model_validator(mode="after")
+    def validate_dates_and_values(self) -> "ContratoGranosCreate":
+        if self.fecha_fin_contrato < self.fecha_inicio_contrato:
+            raise ValueError("La fecha de fin no puede ser anterior a la fecha de inicio")
+        return self
+
+
+class ContratoGranosResponse(ORMModel):
+    id: int
+    carga_id: int | None
+    numero_contrato: str
+    fecha_inicio_contrato: datetime
+    fecha_fin_contrato: datetime
+    productor_id: str
+    productor_nombre: str
+    exportador_id: str
+    exportador_nombre: str
+    tipo_grano: str
+    calidad_grano: str
+    humedad_maxima_permitida: float
+    impurezas_maximas_permitidas: float
+    planta_procedencia_ruca: str
+    planta_destino_ruca: str
+    cantidad_total_kg: float
+    precio_por_kg: float
+    created_at: datetime
+    updated_at: datetime

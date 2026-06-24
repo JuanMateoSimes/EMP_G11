@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_roles
 from app.models.enums import CargaEstado, UserRole
-from app.models.models import Carga, EmpresaPyme, TipoTarifa, User
+from app.models.models import Carga, EmpresaPyme, TipoTarifa, User, TipoAcoplado
 from app.schemas.schemas import CargaCreate, CargaResponse, CargaUpdate, TipoTarifaResponse, PresupuestoRequest, PresupuestoResponse
 from app.services.business import ensure_pyme_owner_or_admin, get_pyme_for_user
 
@@ -20,12 +20,25 @@ def create_carga(
 ) -> Carga:
     pyme = get_pyme_for_user(db, current_user)
     data = payload.model_dump()
+    ids_acoplados = data.pop("idsTiposAcoplados", [])
+    if not ids_acoplados:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Debe seleccionar al menos un tipo de acoplado",
+        )
+    acoplados = db.scalars(select(TipoAcoplado).where(TipoAcoplado.id.in_(ids_acoplados))).all()
+    if len(acoplados) != len(set(ids_acoplados)):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uno o más tipos de acoplados seleccionados no son válidos",
+        )
     if data.get("distancia_km") is None:
         data["distancia_km"] = data.get("cantidadKm") or 0.0
     if data.get("tarifa_base_ton_km") is None:
         tipo = db.get(TipoTarifa, data["idTipoTarifa"])
         data["tarifa_base_ton_km"] = tipo.tarifa_base_ton_km if tipo else 0.0
     carga = Carga(empresa_id=pyme.id, **data)
+    carga.tipos_acoplados = acoplados
     db.add(carga)
     db.commit()
     db.refresh(carga)
@@ -116,6 +129,21 @@ def update_carga(
         )
 
     data = payload.model_dump(exclude_unset=True)
+    if "idsTiposAcoplados" in data:
+        ids_acoplados = data.pop("idsTiposAcoplados")
+        if ids_acoplados is not None:
+            if not ids_acoplados:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Debe seleccionar al menos un tipo de acoplado",
+                )
+            acoplados = db.scalars(select(TipoAcoplado).where(TipoAcoplado.id.in_(ids_acoplados))).all()
+            if len(acoplados) != len(set(ids_acoplados)):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Uno o más tipos de acoplados seleccionados no son válidos",
+                )
+            carga.tipos_acoplados = acoplados
     retiro = data.get("fecha_retiro_deseada", carga.fecha_retiro_deseada)
     entrega = data.get("fecha_entrega_deseada", carga.fecha_entrega_deseada)
     if entrega < retiro:

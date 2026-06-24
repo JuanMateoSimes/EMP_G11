@@ -29,6 +29,7 @@ from app.models.models import (
     User,
     Vehiculo,
     Viaje,
+    TipoAcoplado,
 )
 
 
@@ -45,6 +46,23 @@ def seed() -> None:
             ]
             db.add_all(tipos)
             db.commit()
+
+        # Seed TipoAcoplado if not present
+        if not db.scalar(select(TipoAcoplado)):
+            acoplados = [
+                TipoAcoplado(id=1, nombre="Batea"),
+                TipoAcoplado(id=2, nombre="Semirremolque"),
+                TipoAcoplado(id=3, nombre="Sider"),
+                TipoAcoplado(id=4, nombre="Equipo"),
+                TipoAcoplado(id=5, nombre="Tolva"),
+                TipoAcoplado(id=6, nombre="Bitren"),
+                TipoAcoplado(id=7, nombre="Carreton"),
+                TipoAcoplado(id=8, nombre="PortaCont"),
+            ]
+            db.add_all(acoplados)
+            db.commit()
+
+        acoplados = db.scalars(select(TipoAcoplado).order_by(TipoAcoplado.id.asc())).all()
 
         if db.scalar(select(User).where(User.email == "admin@logexpress.com")):
             print("Seed ya cargado.")
@@ -206,9 +224,6 @@ def seed() -> None:
                 tipo_mercaderia="Materiales de construccion",
                 peso_kg=2500.0,
                 volumen_m3=12.0,
-                requiere_refrigeracion=False,
-                requiere_rampa=False,
-                requiere_mantas=False,
                 origen_direccion="Av. Fuerza Aerea 1234",
                 origen_ciudad="Cordoba",
                 origen_provincia="Cordoba",
@@ -238,6 +253,7 @@ def seed() -> None:
                 hora_inicio_balanza=now + timedelta(days=1, hours=12),
                 hora_fin_balanza=now + timedelta(days=1, hours=13),
                 estado=CargaEstado.CON_OFERTAS,
+                tipos_acoplados=[acoplados[1], acoplados[2]],
             ),
             Carga(
                 empresa_id=pymes[0].id,
@@ -246,9 +262,6 @@ def seed() -> None:
                 tipo_mercaderia="Cemento",
                 peso_kg=5000.0,
                 volumen_m3=16.0,
-                requiere_refrigeracion=False,
-                requiere_rampa=True,
-                requiere_mantas=False,
                 origen_direccion="Av. Fuerza Aerea 1234",
                 origen_ciudad="Cordoba",
                 origen_provincia="Cordoba",
@@ -278,6 +291,7 @@ def seed() -> None:
                 hora_inicio_balanza=None,
                 hora_fin_balanza=None,
                 estado=CargaEstado.PUBLICADA,
+                tipos_acoplados=[acoplados[1]],
             ),
             Carga(
                 empresa_id=pymes[1].id,
@@ -286,9 +300,6 @@ def seed() -> None:
                 tipo_mercaderia="Alimentos secos",
                 peso_kg=1200.0,
                 volumen_m3=10.0,
-                requiere_refrigeracion=False,
-                requiere_rampa=False,
-                requiere_mantas=True,
                 origen_direccion="Juan B. Justo 4500",
                 origen_ciudad="Cordoba",
                 origen_provincia="Cordoba",
@@ -318,6 +329,7 @@ def seed() -> None:
                 hora_inicio_balanza=None,
                 hora_fin_balanza=None,
                 estado=CargaEstado.PUBLICADA,
+                tipos_acoplados=[acoplados[2]],
             ),
             Carga(
                 empresa_id=pymes[1].id,
@@ -326,9 +338,6 @@ def seed() -> None:
                 tipo_mercaderia="Repuestos",
                 peso_kg=900.0,
                 volumen_m3=7.0,
-                requiere_refrigeracion=False,
-                requiere_rampa=False,
-                requiere_mantas=False,
                 origen_direccion="Juan B. Justo 4500",
                 origen_ciudad="Cordoba",
                 origen_provincia="Cordoba",
@@ -358,6 +367,7 @@ def seed() -> None:
                 hora_inicio_balanza=None,
                 hora_fin_balanza=None,
                 estado=CargaEstado.PUBLICADA,
+                tipos_acoplados=[acoplados[0]],
             ),
             Carga(
                 empresa_id=pymes[0].id,
@@ -366,9 +376,6 @@ def seed() -> None:
                 tipo_mercaderia="Ceramicos",
                 peso_kg=1800.0,
                 volumen_m3=9.0,
-                requiere_refrigeracion=False,
-                requiere_rampa=True,
-                requiere_mantas=True,
                 origen_direccion="Av. Fuerza Aerea 1234",
                 origen_ciudad="Cordoba",
                 origen_provincia="Cordoba",
@@ -398,6 +405,77 @@ def seed() -> None:
                 hora_inicio_balanza=None,
                 hora_fin_balanza=None,
                 estado=CargaEstado.PUBLICADA,
+                tipos_acoplados=[acoplados[2]],
+            ),
+            Carga(
+                empresa_id=pymes[0].id,
+                titulo="Viaje Normal en Curso - Alimentos",
+                descripcion="Carga de mercadería de primera necesidad",
+                tipo_mercaderia="Alimentos",
+                peso_kg=3500.0,
+                volumen_m3=18.0,
+                origen_direccion="Bv. Chacabuco 300",
+                origen_ciudad="Cordoba",
+                origen_provincia="Cordoba",
+                origen_lat=Decimal("-31.422500"),
+                origen_lng=Decimal("-64.186000"),
+                destino_direccion="Av. San Martin 120",
+                destino_ciudad="Carlos Paz",
+                destino_provincia="Cordoba",
+                destino_lat=Decimal("-31.417000"),
+                destino_lng=Decimal("-64.492000"),
+                fecha_retiro_deseada=now - timedelta(hours=4),
+                fecha_entrega_deseada=now + timedelta(hours=4),
+                precio_referencia=Decimal("120000"),
+                cantidadKm=36.0,
+                distancia_km=36.0,
+                idTipoTarifa=1,
+                nombreTipoTarifa="Por Kilómetro",
+                tarifa=120000.0,
+                tarifa_base_ton_km=150.0,
+                incluyeIVA=False,
+                hora_inicio_carga=now - timedelta(hours=4),
+                hora_fin_carga=now - timedelta(hours=2),
+                hora_inicio_descarga=now + timedelta(hours=2),
+                hora_fin_descarga=now + timedelta(hours=4),
+                requiere_balanza=False,
+                estado=CargaEstado.EN_CURSO,
+                tipos_acoplados=[acoplados[2]],
+            ),
+            Carga(
+                empresa_id=pymes[0].id,
+                titulo="Viaje con Alerta de Desvío - Insumos",
+                descripcion="Entrega urgente de insumos industriales",
+                tipo_mercaderia="Insumos",
+                peso_kg=8000.0,
+                volumen_m3=30.0,
+                origen_direccion="Bv. Chacabuco 300",
+                origen_ciudad="Cordoba",
+                origen_provincia="Cordoba",
+                origen_lat=Decimal("-31.422500"),
+                origen_lng=Decimal("-64.186000"),
+                destino_direccion="Av. San Martin 120",
+                destino_ciudad="Carlos Paz",
+                destino_provincia="Cordoba",
+                destino_lat=Decimal("-31.417000"),
+                destino_lng=Decimal("-64.492000"),
+                fecha_retiro_deseada=now - timedelta(hours=4),
+                fecha_entrega_deseada=now + timedelta(hours=4),
+                precio_referencia=Decimal("190000"),
+                cantidadKm=36.0,
+                distancia_km=36.0,
+                idTipoTarifa=1,
+                nombreTipoTarifa="Por Kilómetro",
+                tarifa=190000.0,
+                tarifa_base_ton_km=150.0,
+                incluyeIVA=False,
+                hora_inicio_carga=now - timedelta(hours=4),
+                hora_fin_carga=now - timedelta(hours=2),
+                hora_inicio_descarga=now + timedelta(hours=2),
+                hora_fin_descarga=now + timedelta(hours=4),
+                requiere_balanza=False,
+                estado=CargaEstado.EN_CURSO,
+                tipos_acoplados=[acoplados[2]],
             ),
         ]
         db.add_all(cargas)
@@ -440,7 +518,23 @@ def seed() -> None:
             mensaje="Viaje entregado desde seed.",
             estado=OfertaEstado.ACEPTADA,
         )
-        db.add_all([in_progress_offer, delivered_offer])
+        oferta_normal = Oferta(
+            carga_id=cargas[5].id,
+            transportista_id=transportistas[0].id,
+            vehiculo_id=vehiculos[0].id,
+            monto=Decimal("120000"),
+            mensaje="Viaje normal aceptado.",
+            estado=OfertaEstado.ACEPTADA,
+        )
+        oferta_desvio = Oferta(
+            carga_id=cargas[6].id,
+            transportista_id=transportistas[1].id,
+            vehiculo_id=vehiculos[1].id,
+            monto=Decimal("190000"),
+            mensaje="Viaje desvío aceptado.",
+            estado=OfertaEstado.ACEPTADA,
+        )
+        db.add_all([in_progress_offer, delivered_offer, oferta_normal, oferta_desvio])
         db.flush()
 
         cargas[2].estado = CargaEstado.EN_CURSO
@@ -467,7 +561,27 @@ def seed() -> None:
             fecha_entrega=now - timedelta(days=2),
             observaciones="Entrega sin novedades.",
         )
-        db.add_all([viaje_en_curso, viaje_entregado])
+        viaje_normal = Viaje(
+            carga_id=cargas[5].id,
+            oferta_id=oferta_normal.id,
+            empresa_id=cargas[5].empresa_id,
+            transportista_id=oferta_normal.transportista_id,
+            vehiculo_id=oferta_normal.vehiculo_id,
+            estado=ViajeEstado.EN_TRANSITO,
+            fecha_asignacion=now - timedelta(hours=5),
+            fecha_inicio=now - timedelta(hours=3),
+        )
+        viaje_desvio = Viaje(
+            carga_id=cargas[6].id,
+            oferta_id=oferta_desvio.id,
+            empresa_id=cargas[6].empresa_id,
+            transportista_id=oferta_desvio.transportista_id,
+            vehiculo_id=oferta_desvio.vehiculo_id,
+            estado=ViajeEstado.EN_TRANSITO,
+            fecha_asignacion=now - timedelta(hours=5),
+            fecha_inicio=now - timedelta(hours=3),
+        )
+        db.add_all([viaje_en_curso, viaje_entregado, viaje_normal, viaje_desvio])
         db.flush()
 
         db.add(
@@ -478,6 +592,27 @@ def seed() -> None:
                 lng=Decimal("-64.190000"),
                 velocidad=Decimal("54"),
                 timestamp=now - timedelta(minutes=20),
+            )
+        )
+        db.add(
+            TrackingPosition(
+                viaje_id=viaje_normal.id,
+                transportista_id=viaje_normal.transportista_id,
+                lat=Decimal("-31.425000"),
+                lng=Decimal("-64.250000"),
+                velocidad=Decimal("70"),
+                timestamp=now - timedelta(minutes=10),
+            )
+        )
+        db.add(
+            TrackingPosition(
+                viaje_id=viaje_desvio.id,
+                transportista_id=viaje_desvio.transportista_id,
+                lat=Decimal("-31.350000"),
+                lng=Decimal("-64.300000"),
+                velocidad=Decimal("45"),
+                timestamp=now - timedelta(minutes=5),
+                alerta_seguridad="Desvío de ruta detectado",
             )
         )
         db.add(

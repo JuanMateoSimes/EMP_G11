@@ -7,6 +7,7 @@ from app.routers import (
     auth,
     calificaciones,
     cargas,
+    contratos,
     documentos,
     notificaciones,
     ofertas,
@@ -50,6 +51,7 @@ app.include_router(tracking.router)
 app.include_router(pagos.router)
 app.include_router(calificaciones.router)
 app.include_router(notificaciones.router)
+app.include_router(contratos.router)
 
 
 @app.get("/health", tags=["Health"])

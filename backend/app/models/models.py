@@ -14,6 +14,8 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    Column,
+    Table,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -145,6 +147,25 @@ class TipoTarifa(Base):
     tarifa_base_ton_km: Mapped[float] = mapped_column(Float, nullable=False, default=150.0)
 
 
+carga_tipo_acoplado = Table(
+    "carga_tipo_acoplado",
+    Base.metadata,
+    Column("carga_id", ForeignKey("cargas.id", ondelete="CASCADE"), primary_key=True),
+    Column("tipo_acoplado_id", ForeignKey("tipos_acoplados.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+class TipoAcoplado(Base):
+    __tablename__ = "tipos_acoplados"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    nombre: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+
+    cargas: Mapped[list["Carga"]] = relationship(
+        secondary=carga_tipo_acoplado, back_populates="tipos_acoplados"
+    )
+
+
 class Carga(TimestampMixin, Base):
     __tablename__ = "cargas"
 
@@ -155,9 +176,6 @@ class Carga(TimestampMixin, Base):
     tipo_mercaderia: Mapped[str] = mapped_column(String(150), nullable=False)
     peso_kg: Mapped[float] = mapped_column(Float, nullable=False)
     volumen_m3: Mapped[float] = mapped_column(Float, nullable=False)
-    requiere_refrigeracion: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    requiere_rampa: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    requiere_mantas: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     origen_direccion: Mapped[str] = mapped_column(String(255), nullable=False)
     origen_ciudad: Mapped[str] = mapped_column(String(120), nullable=False)
     origen_provincia: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -178,10 +196,10 @@ class Carga(TimestampMixin, Base):
     tarifa: Mapped[float] = mapped_column(Float, nullable=False)
     tarifa_base_ton_km: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     incluyeIVA: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    hora_inicio_carga: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    hora_fin_carga: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    hora_inicio_descarga: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    hora_fin_descarga: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    hora_inicio_carga: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    hora_fin_carga: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    hora_inicio_descarga: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    hora_fin_descarga: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     requiere_balanza: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     ubicacion_balanza: Mapped[str | None] = mapped_column(String(255), nullable=True)
     hora_inicio_balanza: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -189,6 +207,14 @@ class Carga(TimestampMixin, Base):
     estado: Mapped[CargaEstado] = mapped_column(
         Enum(CargaEstado), default=CargaEstado.PUBLICADA, nullable=False, index=True
     )
+
+    tipos_acoplados: Mapped[list["TipoAcoplado"]] = relationship(
+        secondary=carga_tipo_acoplado, back_populates="cargas"
+    )
+
+    @property
+    def idsTiposAcoplados(self) -> list[int]:
+        return [t.id for t in self.tipos_acoplados]
 
     empresa: Mapped[EmpresaPyme] = relationship(back_populates="cargas")
     ofertas: Mapped[list["Oferta"]] = relationship(back_populates="carga")
@@ -321,3 +347,27 @@ class Notificacion(Base):
     )
 
     usuario: Mapped[User] = relationship()
+
+
+class ContratoGranos(TimestampMixin, Base):
+    __tablename__ = "contratos_granos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    carga_id: Mapped[int | None] = mapped_column(ForeignKey("cargas.id"), nullable=True)
+    numero_contrato: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    fecha_inicio_contrato: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    fecha_fin_contrato: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    productor_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    productor_nombre: Mapped[str] = mapped_column(String(255), nullable=False)
+    exportador_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    exportador_nombre: Mapped[str] = mapped_column(String(255), nullable=False)
+    tipo_grano: Mapped[str] = mapped_column(String(100), nullable=False)
+    calidad_grano: Mapped[str] = mapped_column(String(100), nullable=False)
+    humedad_maxima_permitida: Mapped[float] = mapped_column(Float, nullable=False)
+    impurezas_maximas_permitidas: Mapped[float] = mapped_column(Float, nullable=False)
+    planta_procedencia_ruca: Mapped[str] = mapped_column(String(100), nullable=False)
+    planta_destino_ruca: Mapped[str] = mapped_column(String(100), nullable=False)
+    cantidad_total_kg: Mapped[float] = mapped_column(Float, nullable=False)
+    precio_por_kg: Mapped[float] = mapped_column(Float, nullable=False)
+
+    carga: Mapped["Carga | None"] = relationship()

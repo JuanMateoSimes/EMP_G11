@@ -14,7 +14,7 @@ from app.core.database import Base, get_db  # noqa: E402
 from app.core.security import get_password_hash  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.enums import UserRole, UserStatus  # noqa: E402
-from app.models.models import User  # noqa: E402
+from app.models.models import User, TipoAcoplado  # noqa: E402
 
 test_engine = create_engine(
     "sqlite://",
@@ -44,6 +44,16 @@ def database() -> Generator[None, None, None]:
         TipoTarifa(id=1, nombre="Por Kilómetro"),
         TipoTarifa(id=2, nombre="Por Tonelada"),
         TipoTarifa(id=3, nombre="Tarifa Plana"),
+    ])
+    session.add_all([
+        TipoAcoplado(id=1, nombre="Batea"),
+        TipoAcoplado(id=2, nombre="Semirremolque"),
+        TipoAcoplado(id=3, nombre="Sider"),
+        TipoAcoplado(id=4, nombre="Equipo"),
+        TipoAcoplado(id=5, nombre="Tolva"),
+        TipoAcoplado(id=6, nombre="Bitren"),
+        TipoAcoplado(id=7, nombre="Carreton"),
+        TipoAcoplado(id=8, nombre="PortaCont"),
     ])
     session.commit()
     session.close()
