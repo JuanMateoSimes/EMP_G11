@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CalendarClock, MapPin, Navigation, Package, Star, Truck } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarClock, MapPin, Navigation, Package, Star, Truck } from "lucide-react";
 import { Button, Card, EmptyState, StatusBadge } from "@/components/ui";
 import type { Carga, Oferta, TrackingPosition, Vehiculo, Viaje } from "@/lib/types";
 import { formatDate, labelize, money, numberValue } from "@/lib/utils";
@@ -159,10 +159,17 @@ export function TrackingPanel({
   carga?: Carga;
 }) {
   const last = positions[positions.length - 1];
+  const alerta = last?.alerta_seguridad;
   return (
     <div className="grid gap-4 lg:grid-cols-[360px,1fr]">
       <Card className="p-4">
         <h2 className="font-black text-slate-950">Tracking basico</h2>
+        {alerta && (
+          <div className="mt-3 flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800 animate-pulse">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
+            <span>⚠️ ALERTA: {alerta}</span>
+          </div>
+        )}
         {positions.length === 0 ? (
           <EmptyState title="Sin posiciones" text="El transportista todavia no registro ubicaciones para este viaje." />
         ) : (

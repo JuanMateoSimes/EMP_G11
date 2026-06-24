@@ -17,7 +17,9 @@ import type {
   Vehiculo,
   VehiculoEstado,
   Viaje,
-  ViajeEstado
+  ViajeEstado,
+  PresupuestoRequest,
+  PresupuestoResponse
 } from "@/lib/types";
 import { isRecord } from "@/lib/utils";
 
@@ -272,6 +274,22 @@ export const api = {
       return withFallback<Carga>(
         () => apiFetch<Carga>(`/api/cargas/${id}/cancelar`, { method: "PATCH" }),
         () => mockApi.cargas.cancelar(id)
+      );
+    },
+    tiposTarifas() {
+      return withFallback<{ id: number; nombre: string }[]>(
+        () => apiFetch<{ id: number; nombre: string }[]>("/api/cargas/tipostarifas"),
+        () => [
+          { id: 1, nombre: "Por Kilómetro" },
+          { id: 2, nombre: "Por Tonelada" },
+          { id: 3, nombre: "Tarifa Plana" }
+        ]
+      );
+    },
+    calcularPresupuesto(data: PresupuestoRequest) {
+      return withFallback<PresupuestoResponse>(
+        () => apiFetch<PresupuestoResponse>("/api/cargas/calcular-presupuesto", { method: "POST", body: data }),
+        () => mockApi.cargas.calcularPresupuesto(data)
       );
     },
     // TODO: reemplazar por endpoint real de backoffice cuando exista.

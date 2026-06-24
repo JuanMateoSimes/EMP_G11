@@ -29,6 +29,7 @@ def database() -> Generator[None, None, None]:
     Base.metadata.drop_all(bind=test_engine)
     Base.metadata.create_all(bind=test_engine)
     session = TestingSessionLocal()
+    from app.models.models import TipoTarifa
     session.add(
         User(
             nombre="Admin Test",
@@ -39,6 +40,11 @@ def database() -> Generator[None, None, None]:
             estado=UserStatus.ACTIVO,
         )
     )
+    session.add_all([
+        TipoTarifa(id=1, nombre="Por Kilómetro"),
+        TipoTarifa(id=2, nombre="Por Tonelada"),
+        TipoTarifa(id=3, nombre="Tarifa Plana"),
+    ])
     session.commit()
     session.close()
 

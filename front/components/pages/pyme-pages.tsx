@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, ClipboardCheck, CreditCard, Package, PackagePlus, Route, Star } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { AlertTriangle, ArrowRight, CalendarClock, ClipboardCheck, CreditCard, Package, PackagePlus, Route, Star } from "lucide-react";
 import { AppLayout } from "@/components/app-layout";
 import { CargaCard, MapPreview, OfertaCard, TrackingPanel, ViajeCard } from "@/components/domain";
 import {
@@ -56,12 +56,44 @@ const cargaSchema = z
     destino_provincia: z.string().min(2, "Ingresa provincia"),
     fecha_retiro_deseada: z.string().min(1, "Ingresa fecha de retiro"),
     fecha_entrega_deseada: z.string().min(1, "Ingresa fecha de entrega"),
-    precio_referencia: z.coerce.number().min(0, "No puede ser negativo")
+    precio_referencia: z.coerce.number().min(0, "No puede ser negativo"),
+    cantidadKm: z.coerce.number().positive("Debe ser mayor a cero"),
+    distancia_km: z.coerce.number().default(0),
+    idTipoTarifa: z.coerce.number().positive("Selecciona un tipo de tarifa"),
+    nombreTipoTarifa: z.string().min(1, "Selecciona un tipo de tarifa"),
+    tarifa: z.coerce.number().positive("Debe ser mayor a cero"),
+    tarifa_base_ton_km: z.coerce.number().default(0),
+    incluyeIVA: z.boolean().default(false),
+    hora_inicio_carga: z.string().min(1, "Ingresa hora inicio de carga"),
+    hora_fin_carga: z.string().min(1, "Ingresa hora fin de carga"),
+    hora_inicio_descarga: z.string().min(1, "Ingresa hora inicio de descarga"),
+    hora_fin_descarga: z.string().min(1, "Ingresa hora fin de descarga"),
+    requiere_balanza: z.boolean().default(false),
+    ubicacion_balanza: z.string().optional(),
+    hora_inicio_balanza: z.string().optional(),
+    hora_fin_balanza: z.string().optional()
   })
   .refine((data) => new Date(data.fecha_entrega_deseada) >= new Date(data.fecha_retiro_deseada), {
     message: "La entrega no puede ser anterior al retiro",
     path: ["fecha_entrega_deseada"]
-  });
+  })
+  .refine((data) => !data.hora_fin_carga || data.hora_fin_carga >= data.hora_inicio_carga, {
+    message: "Fin de carga debe ser posterior a inicio",
+    path: ["hora_fin_carga"]
+  })
+  .refine((data) => !data.hora_fin_descarga || data.hora_fin_descarga >= data.hora_inicio_descarga, {
+    message: "Fin de descarga debe ser posterior a inicio",
+    path: ["hora_fin_descarga"]
+  })
+  .refine(
+    (data) =>
+      !data.requiere_balanza ||
+      (data.ubicacion_balanza && data.hora_inicio_balanza && data.hora_fin_balanza),
+    {
+      message: "Completa los datos de la balanza",
+      path: ["ubicacion_balanza"]
+    }
+  );
 
 const ratingSchema = z.object({
   puntaje: z.coerce.number().min(1).max(5),
@@ -187,6 +219,21 @@ export function NuevaCargaPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [step, setStep] = useState(1);
+  const [tiposTarifas, setTiposTarifas] = useState<{ id: number; nombre: string; tarifa_base_ton_km: number }[]>([]);
+
+  const [presupuestoSugerido, setPresupuestoSugerido] = useState<number | null>(null);
+  const [pesoTasable, setPesoTasable] = useState<number | null>(null);
+  const [motivoTasacion, setMotivoTasacion] = useState<string | null>(null);
+  const [loadingPresupuesto, setLoadingPresupuesto] = useState(false);
+  const [errorPresupuesto, setErrorPresupuesto] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.cargas.tiposTarifas()
+      .then(setTiposTarifas as any)
+      .catch((err) => console.error("Error al cargar tipos de tarifas", err));
+  }, []);
+
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const nextDay = new Date();
@@ -210,9 +257,94 @@ export function NuevaCargaPage() {
       destino_provincia: "",
       fecha_retiro_deseada: dateInputValue(tomorrow),
       fecha_entrega_deseada: dateInputValue(nextDay),
-      precio_referencia: 0
+      precio_referencia: 0,
+      cantidadKm: 0,
+      distancia_km: 0,
+      idTipoTarifa: "" as any,
+      nombreTipoTarifa: "",
+      tarifa: 0,
+      tarifa_base_ton_km: 0,
+      incluyeIVA: false,
+      hora_inicio_carga: "",
+      hora_fin_carga: "",
+      hora_inicio_descarga: "",
+      hora_fin_descarga: "",
+      requiere_balanza: false,
+      ubicacion_balanza: "",
+      hora_inicio_balanza: "",
+      hora_fin_balanza: ""
     }
   });
+
+  const watchIdTipoTarifa = form.watch("idTipoTarifa");
+  const watchCantidadKm = form.watch("cantidadKm");
+  const watchPesoKg = form.watch("peso_kg");
+  const watchVolumenM3 = form.watch("volumen_m3");
+
+  useEffect(() => {
+    if (step === 3 && watchIdTipoTarifa && watchCantidadKm > 0 && watchPesoKg > 0 && watchVolumenM3 > 0) {
+      setLoadingPresupuesto(true);
+      setErrorPresupuesto(null);
+      api.cargas.calcularPresupuesto({
+        distancia_km: Number(watchCantidadKm),
+        peso_kg: Number(watchPesoKg),
+        volumen_m3: Number(watchVolumenM3),
+        id_tipo_tarifa: Number(watchIdTipoTarifa)
+      })
+        .then((res) => {
+          setPresupuestoSugerido(res.presupuesto_sugerido);
+          setPesoTasable(res.peso_tasable_kg);
+          setMotivoTasacion(res.motivo_tasacion);
+        })
+        .catch((err) => {
+          console.error("Error al calcular presupuesto", err);
+          setErrorPresupuesto("No se pudo calcular el flete sugerido.");
+        })
+        .finally(() => {
+          setLoadingPresupuesto(false);
+        });
+    }
+  }, [step, watchIdTipoTarifa, watchCantidadKm, watchPesoKg, watchVolumenM3]);
+
+  async function nextStep() {
+    let fieldsToValidate: Array<keyof CargaForm> = [];
+    if (step === 1) {
+      fieldsToValidate = [
+        "titulo",
+        "tipo_mercaderia",
+        "descripcion",
+        "requiere_refrigeracion",
+        "requiere_rampa",
+        "requiere_mantas",
+        "hora_inicio_carga",
+        "hora_fin_carga",
+        "hora_inicio_descarga",
+        "hora_fin_descarga",
+        "requiere_balanza",
+        "ubicacion_balanza",
+        "hora_inicio_balanza",
+        "hora_fin_balanza"
+      ];
+    } else if (step === 2) {
+      fieldsToValidate = [
+        "origen_direccion",
+        "origen_ciudad",
+        "origen_provincia",
+        "destino_direccion",
+        "destino_ciudad",
+        "destino_provincia",
+        "fecha_retiro_deseada",
+        "fecha_entrega_deseada",
+        "cantidadKm",
+        "peso_kg",
+        "volumen_m3"
+      ];
+    }
+    const isStepValid = await form.trigger(fieldsToValidate);
+    if (isStepValid) {
+      setStep((prev) => prev + 1);
+    }
+  }
 
   async function onSubmit(values: CargaForm) {
     setError(null);
@@ -223,6 +355,17 @@ export function NuevaCargaPage() {
         descripcion: values.descripcion || null,
         fecha_retiro_deseada: isoFromInput(values.fecha_retiro_deseada),
         fecha_entrega_deseada: isoFromInput(values.fecha_entrega_deseada),
+        precio_referencia: values.tarifa,
+        distancia_km: Number(values.cantidadKm),
+        tarifa_base_ton_km: Number(values.tarifa_base_ton_km || 0),
+        hora_inicio_carga: isoFromInput(values.hora_inicio_carga),
+        hora_fin_carga: isoFromInput(values.hora_fin_carga),
+        hora_inicio_descarga: isoFromInput(values.hora_inicio_descarga),
+        hora_fin_descarga: isoFromInput(values.hora_fin_descarga),
+        requiere_balanza: values.requiere_balanza,
+        ubicacion_balanza: values.requiere_balanza ? (values.ubicacion_balanza || null) : null,
+        hora_inicio_balanza: values.requiere_balanza && values.hora_inicio_balanza ? isoFromInput(values.hora_inicio_balanza) : null,
+        hora_fin_balanza: values.requiere_balanza && values.hora_fin_balanza ? isoFromInput(values.hora_fin_balanza) : null,
         origen_lat: null,
         origen_lng: null,
         destino_lat: null,
@@ -240,42 +383,320 @@ export function NuevaCargaPage() {
       <SectionTitle title="Publicar carga" />
       {success ? <SuccessMessage message={success} onClose={() => setSuccess(null)} /> : null}
       {error ? <ErrorState message={error} /> : null}
+
+      {/* Indicador de Pasos */}
+      <div className="mb-6 flex items-center justify-between px-2">
+        <div className="flex items-center gap-3">
+          <div className={`grid h-8 w-8 place-items-center rounded-full text-xs font-black shadow-sm ${
+            step >= 1 ? "bg-navy text-white" : "bg-slate-100 text-slate-400"
+          }`}>
+            1
+          </div>
+          <span className={`text-sm font-bold ${step === 1 ? "text-navy" : "text-slate-400"}`}>
+            Carga
+          </span>
+        </div>
+        <div className="h-0.5 flex-1 bg-line mx-4" />
+        <div className="flex items-center gap-3">
+          <div className={`grid h-8 w-8 place-items-center rounded-full text-xs font-black shadow-sm ${
+            step >= 2 ? "bg-navy text-white" : "bg-slate-100 text-slate-400"
+          }`}>
+            2
+          </div>
+          <span className={`text-sm font-bold ${step === 2 ? "text-navy" : "text-slate-400"}`}>
+            Ruta y Cargamento
+          </span>
+        </div>
+        <div className="h-0.5 flex-1 bg-line mx-4" />
+        <div className="flex items-center gap-3">
+          <div className={`grid h-8 w-8 place-items-center rounded-full text-xs font-black shadow-sm ${
+            step >= 3 ? "bg-navy text-white" : "bg-slate-100 text-slate-400"
+          }`}>
+            3
+          </div>
+          <span className={`text-sm font-bold ${step === 3 ? "text-navy" : "text-slate-400"}`}>
+            Tarifas e IVA
+          </span>
+        </div>
+      </div>
+
       <Card className="p-5">
         <form className="grid gap-4" onSubmit={form.handleSubmit(onSubmit)}>
-          <div className="grid gap-4 md:grid-cols-2">
-            <FormInput label="Titulo" error={form.formState.errors.titulo?.message} {...form.register("titulo")} />
-            <FormInput label="Tipo de mercaderia" error={form.formState.errors.tipo_mercaderia?.message} {...form.register("tipo_mercaderia")} />
-          </div>
-          <FormTextarea label="Descripcion" error={form.formState.errors.descripcion?.message} {...form.register("descripcion")} />
-          <div className="grid gap-4 md:grid-cols-3">
-            <FormInput label="Peso kg" type="number" error={form.formState.errors.peso_kg?.message} {...form.register("peso_kg")} />
-            <FormInput label="Volumen m3" type="number" error={form.formState.errors.volumen_m3?.message} {...form.register("volumen_m3")} />
-            <FormInput label="Precio referencia" type="number" error={form.formState.errors.precio_referencia?.message} {...form.register("precio_referencia")} />
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <CheckboxField label="Refrigeracion" {...form.register("requiere_refrigeracion")} />
-            <CheckboxField label="Rampa" {...form.register("requiere_rampa")} />
-            <CheckboxField label="Mantas" {...form.register("requiere_mantas")} />
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            <FormInput label="Origen direccion" error={form.formState.errors.origen_direccion?.message} {...form.register("origen_direccion")} />
-            <FormInput label="Origen ciudad" error={form.formState.errors.origen_ciudad?.message} {...form.register("origen_ciudad")} />
-            <FormInput label="Origen provincia" error={form.formState.errors.origen_provincia?.message} {...form.register("origen_provincia")} />
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            <FormInput label="Destino direccion" error={form.formState.errors.destino_direccion?.message} {...form.register("destino_direccion")} />
-            <FormInput label="Destino ciudad" error={form.formState.errors.destino_ciudad?.message} {...form.register("destino_ciudad")} />
-            <FormInput label="Destino provincia" error={form.formState.errors.destino_provincia?.message} {...form.register("destino_provincia")} />
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <FormInput label="Fecha retiro" type="datetime-local" error={form.formState.errors.fecha_retiro_deseada?.message} {...form.register("fecha_retiro_deseada")} />
-            <FormInput label="Fecha entrega" type="datetime-local" error={form.formState.errors.fecha_entrega_deseada?.message} {...form.register("fecha_entrega_deseada")} />
-          </div>
-          <div className="flex justify-end">
-            <Button type="submit" loading={form.formState.isSubmitting}>
-              Publicar <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
+          {step === 1 && (
+            <div className="grid gap-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormInput label="Titulo" error={form.formState.errors.titulo?.message} {...form.register("titulo")} />
+                <FormInput label="Tipo de mercaderia" error={form.formState.errors.tipo_mercaderia?.message} {...form.register("tipo_mercaderia")} />
+              </div>
+              <FormTextarea label="Descripcion" error={form.formState.errors.descripcion?.message} {...form.register("descripcion")} />
+              <div className="grid gap-3 md:grid-cols-3">
+                <CheckboxField label="Refrigeracion" {...form.register("requiere_refrigeracion")} />
+                <CheckboxField label="Rampa" {...form.register("requiere_rampa")} />
+                <CheckboxField label="Mantas" {...form.register("requiere_mantas")} />
+              </div>
+
+              {/* Ventana Horaria de Carga */}
+              <div className="rounded-lg border border-line bg-slate-50 p-4 grid gap-3">
+                <p className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                  <CalendarClock className="h-4 w-4 text-navy" /> Ventana horaria de carga
+                </p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <FormInput
+                    label="Inicio de carga"
+                    type="datetime-local"
+                    error={form.formState.errors.hora_inicio_carga?.message}
+                    {...form.register("hora_inicio_carga")}
+                  />
+                  <FormInput
+                    label="Fin de carga"
+                    type="datetime-local"
+                    error={form.formState.errors.hora_fin_carga?.message}
+                    {...form.register("hora_fin_carga")}
+                  />
+                </div>
+              </div>
+
+              {/* Ventana Horaria de Descarga */}
+              <div className="rounded-lg border border-line bg-slate-50 p-4 grid gap-3">
+                <p className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                  <CalendarClock className="h-4 w-4 text-navy" /> Ventana horaria de descarga
+                </p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <FormInput
+                    label="Inicio de descarga"
+                    type="datetime-local"
+                    error={form.formState.errors.hora_inicio_descarga?.message}
+                    {...form.register("hora_inicio_descarga")}
+                  />
+                  <FormInput
+                    label="Fin de descarga"
+                    type="datetime-local"
+                    error={form.formState.errors.hora_fin_descarga?.message}
+                    {...form.register("hora_fin_descarga")}
+                  />
+                </div>
+              </div>
+
+              {/* Balanza */}
+              <div className="rounded-lg border border-line p-4 grid gap-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-slate-950">¿Requiere pesaje en balanza?</p>
+                    <p className="text-xs text-slate-500">Obligatorio si la mercadería supera las tolerancias de peso</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={form.watch("requiere_balanza")}
+                      onChange={(e) => form.setValue("requiere_balanza", e.target.checked, { shouldValidate: true })}
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                  </label>
+                </div>
+                {form.watch("requiere_balanza") && (
+                  <div className="grid gap-3 border-t border-line pt-3">
+                    <FormInput
+                      label="Ubicacion de la balanza"
+                      placeholder="Ej: Balanza Ruta 9 km 50, Rosario"
+                      error={form.formState.errors.ubicacion_balanza?.message}
+                      {...form.register("ubicacion_balanza")}
+                    />
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <FormInput
+                        label="Horario inicio balanza"
+                        type="datetime-local"
+                        error={form.formState.errors.hora_inicio_balanza?.message}
+                        {...form.register("hora_inicio_balanza")}
+                      />
+                      <FormInput
+                        label="Horario fin balanza"
+                        type="datetime-local"
+                        error={form.formState.errors.hora_fin_balanza?.message}
+                        {...form.register("hora_fin_balanza")}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end mt-4">
+                <Button type="button" onClick={nextStep}>
+                  Siguiente <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div className="grid gap-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <FormInput label="Origen direccion" error={form.formState.errors.origen_direccion?.message} {...form.register("origen_direccion")} />
+                <FormInput label="Origen ciudad" error={form.formState.errors.origen_ciudad?.message} {...form.register("origen_ciudad")} />
+                <FormInput label="Origen provincia" error={form.formState.errors.origen_provincia?.message} {...form.register("origen_provincia")} />
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <FormInput label="Destino direccion" error={form.formState.errors.destino_direccion?.message} {...form.register("destino_direccion")} />
+                <FormInput label="Destino ciudad" error={form.formState.errors.destino_ciudad?.message} {...form.register("destino_ciudad")} />
+                <FormInput label="Destino provincia" error={form.formState.errors.destino_provincia?.message} {...form.register("destino_provincia")} />
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <FormInput label="Fecha retiro" type="datetime-local" error={form.formState.errors.fecha_retiro_deseada?.message} {...form.register("fecha_retiro_deseada")} />
+                <FormInput label="Fecha entrega" type="datetime-local" error={form.formState.errors.fecha_entrega_deseada?.message} {...form.register("fecha_entrega_deseada")} />
+                <FormInput label="Kilómetros" type="number" error={form.formState.errors.cantidadKm?.message} {...form.register("cantidadKm")} />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormInput label="Peso total (Kg)" type="number" error={form.formState.errors.peso_kg?.message} {...form.register("peso_kg")} />
+                <div className="flex flex-col gap-1">
+                  <FormInput label="Volumen total (m³)" type="number" error={form.formState.errors.volumen_m3?.message} {...form.register("volumen_m3")} />
+                  <span className="text-[11px] text-slate-400 font-semibold px-1">Largo x Ancho x Alto de la carga</span>
+                </div>
+              </div>
+              <div className="flex justify-between mt-4">
+                <Button type="button" variant="secondary" onClick={() => setStep(1)}>
+                  Atrás
+                </Button>
+                <Button type="button" onClick={nextStep}>
+                  Siguiente <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="grid gap-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormInput label="Tarifa" type="number" error={form.formState.errors.tarifa?.message} {...form.register("tarifa")} />
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-bold text-slate-700">Tipo de Tarifa</label>
+                  <select
+                    value={form.watch("idTipoTarifa") || ""}
+                    onChange={(e) => {
+                      const val = e.target.value ? Number(e.target.value) : 0;
+                      const selected = tiposTarifas.find((t) => t.id === val);
+                      if (selected) {
+                        form.setValue("idTipoTarifa", selected.id, { shouldValidate: true });
+                        form.setValue("nombreTipoTarifa", selected.nombre, { shouldValidate: true });
+                        form.setValue("tarifa_base_ton_km", selected.tarifa_base_ton_km || 0, { shouldValidate: true });
+                      } else {
+                        form.setValue("idTipoTarifa", 0, { shouldValidate: true });
+                        form.setValue("nombreTipoTarifa", "", { shouldValidate: true });
+                        form.setValue("tarifa_base_ton_km", 0, { shouldValidate: true });
+                      }
+                    }}
+                    className="w-full rounded-md border border-line bg-white p-2.5 text-sm focus:border-navy focus:outline-none focus:ring-1 focus:ring-navy"
+                  >
+                    <option value="">Selecciona un tipo...</option>
+                    {tiposTarifas.map((tipo) => (
+                      <option key={tipo.id} value={tipo.id}>
+                        {tipo.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  {form.formState.errors.nombreTipoTarifa && (
+                    <p className="text-xs text-red-500 font-semibold">{form.formState.errors.nombreTipoTarifa.message}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Bloque de Resumen Logístico */}
+              {loadingPresupuesto && (
+                <div className="rounded-lg border border-line p-4 bg-slate-50 flex items-center justify-center text-sm text-slate-500">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-navy border-t-transparent mr-2" />
+                  Calculando presupuesto sugerido...
+                </div>
+              )}
+
+              {!loadingPresupuesto && errorPresupuesto && (
+                <div className="rounded-lg border border-red-200 p-4 bg-red-50 text-sm text-red-800">
+                  {errorPresupuesto}
+                </div>
+              )}
+
+              {!loadingPresupuesto && presupuestoSugerido !== null && (
+                <div className="rounded-lg border border-slate-200 p-4 bg-slate-50 text-slate-900 text-sm shadow-sm">
+                  <h3 className="font-bold text-slate-950 flex items-center gap-2 mb-3">
+                    <Package className="h-4 w-4 text-navy" /> Resumen y Cotización Logística
+                  </h3>
+                  
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500">Peso Real bruto</p>
+                      <p className="font-bold text-slate-800">{watchPesoKg} Kg</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500">Peso por Volumen ({watchVolumenM3} m³ x 300)</p>
+                      <p className="font-bold text-slate-800">{(watchVolumenM3 * 300)} Kg</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 border-t border-line pt-3">
+                    <p className="text-xs font-semibold text-slate-500">Criterio de Tasación (Peso Tasable)</p>
+                    <p className="font-bold text-navy mt-1">
+                      Su carga se tarifará sobre los <span className="underline decoration-navy decoration-2">{pesoTasable} Kg</span> debido a que{" "}
+                      {motivoTasacion === "volumen_excedente" 
+                        ? "el volumen ocupa mayor espacio relativo (aforo)." 
+                        : "el peso bruto real es superior al peso volumétrico."}
+                    </p>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-white border border-line p-3">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500">Presupuesto Sugerido Base</p>
+                      <p className="text-lg font-black text-navy">{money(presupuestoSugerido)}</p>
+                    </div>
+                    <Button 
+                      type="button" 
+                      onClick={() => form.setValue("tarifa", presupuestoSugerido, { shouldValidate: true })}
+                      className="bg-navy hover:bg-navy-dark text-white font-semibold py-1.5 px-3 text-xs rounded transition-all shadow-sm"
+                    >
+                      Aplicar Tarifa Sugerida
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between rounded-lg border border-line p-3 bg-slate-50">
+                <div>
+                  <p className="text-sm font-bold text-slate-950">Incluye IVA</p>
+                  <p className="text-xs text-slate-500">¿El monto ingresado ya cuenta con IVA?</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={form.watch("incluyeIVA")}
+                    onChange={(e) => form.setValue("incluyeIVA", e.target.checked)}
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-navy"></div>
+                </label>
+              </div>
+
+              {!form.watch("incluyeIVA") && Number(form.watch("tarifa")) > 0 && (
+                <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-amber-800 text-sm">
+                  <div className="flex gap-2 items-start">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                    <div>
+                      <p className="font-bold">Advertencia de Costo Real (IVA no incluido)</p>
+                      <p className="mt-1">
+                        El flete se publicará sin IVA. El costo total estimado para la PyME con el +21% de IVA será de:{" "}
+                        <strong>{money(Number(form.watch("tarifa")) * 1.21)}</strong> (Subtotal: {money(Number(form.watch("tarifa")))}, IVA: {money(Number(form.watch("tarifa")) * 0.21)}).
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-between mt-4">
+                <Button type="button" variant="secondary" onClick={() => setStep(2)}>
+                  Atrás
+                </Button>
+                <Button type="submit" loading={form.formState.isSubmitting}>
+                  Publicar Carga <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </form>
       </Card>
     </AppLayout>
@@ -359,18 +780,19 @@ export function PymeViajesPage() {
   const searchParams = useSearchParams();
   const tab = normalizePymeViajesTab(searchParams.get("tab"));
   const resource = useResource(loadViajesWithCargas, []);
+  const data = resource.data;
   return (
     <AppLayout role="PYME">
       <SectionTitle title={tab === "pagos" ? "Mis pagos" : tab === "tracking" ? "Tracking" : "Mis viajes"} />
       {resource.loading ? <LoadingState /> : null}
       {resource.error ? <ErrorState message={resource.error} onRetry={resource.reload} /> : null}
-      {resource.data?.viajes.length === 0 ? <EmptyState title="Sin viajes" text="Los viajes aparecen cuando aceptas una oferta." /> : null}
-      {resource.data ? (
+      {data?.viajes.length === 0 ? <EmptyState title="Sin viajes" text="Los viajes aparecen cuando aceptas una oferta." /> : null}
+      {data ? (
         tab === "pagos" ? (
           <div className="grid gap-4">
-            {resource.data.viajes.map((viaje) => {
-              const carga = resource.data.cargas[viaje.carga_id];
-              const pago = resource.data.pagos[viaje.id];
+            {data.viajes.map((viaje) => {
+              const carga = data.cargas[viaje.carga_id];
+              const pago = data.pagos[viaje.id];
               return (
                 <Card key={viaje.id} className="p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -411,9 +833,9 @@ export function PymeViajesPage() {
           </div>
         ) : tab === "tracking" ? (
           <div className="grid gap-4">
-            {resource.data.viajes.map((viaje) => {
-              const carga = resource.data.cargas[viaje.carga_id];
-              const lastPosition = resource.data.lastTracking[viaje.id];
+            {data.viajes.map((viaje) => {
+              const carga = data.cargas[viaje.carga_id];
+              const lastPosition = data.lastTracking[viaje.id];
               return (
                 <Card key={viaje.id} className="p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -456,8 +878,8 @@ export function PymeViajesPage() {
           </div>
         ) : (
           <div className="grid gap-4">
-            {resource.data.viajes.map((viaje) => (
-              <ViajeCard key={viaje.id} viaje={viaje} carga={resource.data.cargas[viaje.carga_id]} href={`/pyme/viajes/${viaje.id}`} />
+            {data.viajes.map((viaje) => (
+              <ViajeCard key={viaje.id} viaje={viaje} carga={data.cargas[viaje.carga_id]} href={`/pyme/viajes/${viaje.id}`} />
             ))}
           </div>
         )
@@ -628,14 +1050,50 @@ function CargaSummary({ carga }: { carga: Carga }) {
           <p className="mt-1 text-sm text-slate-500">{carga.descripcion ?? "Sin descripcion"}</p>
         </div>
         <div className="text-left sm:text-right">
-          <p className="text-xs font-bold uppercase text-slate-400">Precio referencia</p>
-          <p className="text-xl font-black text-navy">{money(carga.precio_referencia)}</p>
+          <p className="text-xs font-bold uppercase text-slate-400">Tarifa ({carga.nombreTipoTarifa})</p>
+          <p className="text-xl font-black text-navy">{money(carga.tarifa)}</p>
+          <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+            {carga.incluyeIVA ? "IVA Incluido" : "IVA No Incluido (+21%)"}
+          </p>
+          {Number(carga.tarifa_base_ton_km) > 0 && (
+            <p className="text-[11px] font-semibold text-slate-400 mt-0.5">
+              Ref. Base: {money(carga.tarifa_base_ton_km)} / Ton-Km
+            </p>
+          )}
         </div>
       </div>
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
+      <div className="mt-4 grid gap-3 grid-cols-2 md:grid-cols-6">
         <Info label="Origen" value={`${carga.origen_direccion}, ${carga.origen_ciudad}`} />
         <Info label="Destino" value={`${carga.destino_direccion}, ${carga.destino_ciudad}`} />
+        <Info label="Distancia" value={`${carga.distancia_km || carga.cantidadKm} km`} />
+        <Info label="Peso" value={`${carga.peso_kg} kg`} />
+        <Info label="Volumen" value={`${carga.volumen_m3} m³`} />
         <Info label="Retiro" value={formatDate(carga.fecha_retiro_deseada)} />
+      </div>
+      {/* Ventanas horarias y balanza */}
+      <div className="mt-4 grid gap-3 border-t border-line pt-4">
+        <p className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
+          <CalendarClock className="h-3.5 w-3.5" /> Logística operativa
+        </p>
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+          <Info label="Inicio carga" value={formatDate(carga.hora_inicio_carga)} />
+          <Info label="Fin carga" value={formatDate(carga.hora_fin_carga)} />
+          <Info label="Inicio descarga" value={formatDate(carga.hora_inicio_descarga)} />
+          <Info label="Fin descarga" value={formatDate(carga.hora_fin_descarga)} />
+        </div>
+        {carga.requiere_balanza && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
+            <p className="font-bold text-amber-800">⚖️ Requiere pesaje en balanza</p>
+            {carga.ubicacion_balanza && (
+              <p className="text-amber-700 mt-1">Ubicacion: {carga.ubicacion_balanza}</p>
+            )}
+            {carga.hora_inicio_balanza && carga.hora_fin_balanza && (
+              <p className="text-amber-700 mt-0.5">
+                Horario: {formatDate(carga.hora_inicio_balanza)} – {formatDate(carga.hora_fin_balanza)}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </Card>
   );

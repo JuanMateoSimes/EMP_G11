@@ -1,3 +1,4 @@
+import http
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, Request, status
@@ -7,10 +8,14 @@ from sqlalchemy.exc import IntegrityError
 
 
 def _payload(request: Request, status_code: int, message: str) -> dict[str, object]:
+    try:
+        error_phrase = http.HTTPStatus(status_code).phrase
+    except ValueError:
+        error_phrase = "Error"
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "status": status_code,
-        "error": status.HTTP_STATUS_CODES.get(status_code, "Error"),
+        "error": error_phrase,
         "message": message,
         "path": request.url.path,
     }

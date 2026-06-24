@@ -227,6 +227,21 @@ function seedState(): MockState {
         fecha_retiro_deseada: daysFromNow(1),
         fecha_entrega_deseada: daysFromNow(2),
         precio_referencia: 420000,
+        cantidadKm: 400,
+        distancia_km: 400,
+        idTipoTarifa: 1,
+        nombreTipoTarifa: "Por Kilómetro",
+        tarifa: 420000,
+        tarifa_base_ton_km: 150,
+        incluyeIVA: false,
+        hora_inicio_carga: daysFromNow(1),
+        hora_fin_carga: daysFromNow(1),
+        hora_inicio_descarga: daysFromNow(2),
+        hora_fin_descarga: daysFromNow(2),
+        requiere_balanza: true,
+        ubicacion_balanza: "Balanza Ruta 9 km 25",
+        hora_inicio_balanza: daysFromNow(1),
+        hora_fin_balanza: daysFromNow(1),
         estado: "CON_OFERTAS",
         created_at: stamp,
         updated_at: stamp
@@ -255,6 +270,21 @@ function seedState(): MockState {
         fecha_retiro_deseada: daysFromNow(3),
         fecha_entrega_deseada: daysFromNow(4),
         precio_referencia: 210000,
+        cantidadKm: 360,
+        distancia_km: 360,
+        idTipoTarifa: 1,
+        nombreTipoTarifa: "Por Kilómetro",
+        tarifa: 210000,
+        tarifa_base_ton_km: 150,
+        incluyeIVA: false,
+        hora_inicio_carga: daysFromNow(3),
+        hora_fin_carga: daysFromNow(3),
+        hora_inicio_descarga: daysFromNow(4),
+        hora_fin_descarga: daysFromNow(4),
+        requiere_balanza: false,
+        ubicacion_balanza: null,
+        hora_inicio_balanza: null,
+        hora_fin_balanza: null,
         estado: "PUBLICADA",
         created_at: stamp,
         updated_at: stamp
@@ -283,6 +313,21 @@ function seedState(): MockState {
         fecha_retiro_deseada: daysFromNow(-1),
         fecha_entrega_deseada: daysFromNow(1),
         precio_referencia: 315000,
+        cantidadKm: 170,
+        distancia_km: 170,
+        idTipoTarifa: 3,
+        nombreTipoTarifa: "Tarifa Plana",
+        tarifa: 315000,
+        tarifa_base_ton_km: 100,
+        incluyeIVA: false,
+        hora_inicio_carga: daysFromNow(-1),
+        hora_fin_carga: daysFromNow(-1),
+        hora_inicio_descarga: daysFromNow(1),
+        hora_fin_descarga: daysFromNow(1),
+        requiere_balanza: false,
+        ubicacion_balanza: null,
+        hora_inicio_balanza: null,
+        hora_fin_balanza: null,
         estado: "EN_CURSO",
         created_at: stamp,
         updated_at: stamp
@@ -338,6 +383,7 @@ function seedState(): MockState {
         lng: -60.92,
         velocidad: 74,
         timestamp: daysFromNow(-1),
+        alerta_seguridad: "Desvío de ruta detectado",
         created_at: daysFromNow(-1)
       },
       {
@@ -792,6 +838,27 @@ export const mockApi = {
         carga.updated_at = nowIso();
         return carga;
       });
+    },
+    calcularPresupuesto(data: {
+      distancia_km: number;
+      peso_kg: number;
+      volumen_m3: number;
+      id_tipo_tarifa: number;
+    }) {
+      const FACTOR_VOLUMEN = 300;
+      const peso_volumetrico = data.volumen_m3 * FACTOR_VOLUMEN;
+      const peso_tasable_kg = Math.max(data.peso_kg, peso_volumetrico);
+      const toneladas_tasables = peso_tasable_kg / 1000;
+      let tarifa_base_ton_km = 150.0;
+      if (data.id_tipo_tarifa === 2) tarifa_base_ton_km = 120.0;
+      else if (data.id_tipo_tarifa === 3) tarifa_base_ton_km = 100.0;
+      const presupuesto_sugerido = toneladas_tasables * data.distancia_km * tarifa_base_ton_km;
+      const motivo_tasacion = peso_volumetrico > data.peso_kg ? "volumen_excedente" : "peso_real";
+      return {
+        peso_tasable_kg,
+        motivo_tasacion: motivo_tasacion as "peso_real" | "volumen_excedente",
+        presupuesto_sugerido: Math.round(presupuesto_sugerido * 100) / 100
+      };
     }
   },
   ofertas: {

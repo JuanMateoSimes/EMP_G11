@@ -356,7 +356,7 @@ export default function HomePage() {
                 <AlertTriangle className="h-6 w-6" />
               </div>
               <div>
-                <h4 className="text-lg font-bold">"¿La mayoría de los transportistas se preocupa por el consumo de batería y datos?"</h4>
+                <h4 className="text-lg font-bold">&ldquo;¿La mayoría de los transportistas se preocupa por el consumo de batería y datos?&rdquo;</h4>
                 <p className="text-sm text-slate-300 max-w-xl mt-1">
                   En nuestras entrevistas detectamos este dolor. Por eso, optimizamos el seguimiento GPS para consumir el mínimo de batería posible y no ahogar el plan de datos móvil del chofer.
                 </p>

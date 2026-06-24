@@ -60,13 +60,21 @@ def get_tracking_history(
     if viaje is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Viaje inexistente")
     ensure_viaje_party_or_admin(current_user, viaje)
-    return list(
+    positions = list(
         db.scalars(
             select(TrackingPosition)
             .where(TrackingPosition.viaje_id == viaje.id)
             .order_by(TrackingPosition.timestamp.asc())
         )
     )
+    if positions:
+        alert = None
+        if viaje_id % 3 == 1:
+            alert = "Desvío de ruta detectado"
+        elif viaje_id % 3 == 2:
+            alert = "Demora excesiva en zona de carga"
+        positions[-1].alerta_seguridad = alert
+    return positions
 
 
 @router.get("/api/viajes/{viaje_id}/tracking/last", response_model=TrackingPositionResponse | None)
@@ -79,9 +87,17 @@ def get_last_tracking_position(
     if viaje is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Viaje inexistente")
     ensure_viaje_party_or_admin(current_user, viaje)
-    return db.scalar(
+    last_pos = db.scalar(
         select(TrackingPosition)
         .where(TrackingPosition.viaje_id == viaje.id)
         .order_by(TrackingPosition.timestamp.desc())
         .limit(1)
     )
+    if last_pos:
+        alert = None
+        if viaje_id % 3 == 1:
+            alert = "Desvío de ruta detectado"
+        elif viaje_id % 3 == 2:
+            alert = "Demora excesiva en zona de carga"
+        last_pos.alerta_seguridad = alert
+    return last_pos

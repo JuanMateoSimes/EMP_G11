@@ -204,12 +204,31 @@ class DocumentoResponse(ORMModel):
     updated_at: datetime
 
 
+class TipoTarifaResponse(ORMModel):
+    id: int
+    nombre: str
+    tarifa_base_ton_km: float
+
+
+class PresupuestoRequest(BaseModel):
+    distancia_km: float = Field(gt=0)
+    peso_kg: float = Field(gt=0)
+    volumen_m3: float = Field(gt=0)
+    id_tipo_tarifa: int
+
+
+class PresupuestoResponse(BaseModel):
+    peso_tasable_kg: float
+    motivo_tasacion: str
+    presupuesto_sugerido: float
+
+
 class CargaCreate(BaseModel):
     titulo: str = Field(min_length=2, max_length=180)
     descripcion: str | None = None
     tipo_mercaderia: str = Field(min_length=2, max_length=150)
-    peso_kg: Decimal = Field(gt=0)
-    volumen_m3: Decimal = Field(gt=0)
+    peso_kg: float = Field(gt=0)
+    volumen_m3: float = Field(gt=0)
     requiere_refrigeracion: bool = False
     requiere_rampa: bool = False
     requiere_mantas: bool = False
@@ -225,7 +244,22 @@ class CargaCreate(BaseModel):
     destino_lng: Decimal | None = None
     fecha_retiro_deseada: datetime
     fecha_entrega_deseada: datetime
-    precio_referencia: Decimal = Field(ge=0)
+    precio_referencia: Decimal = Field(default=Decimal("0.00"), ge=0)
+    cantidadKm: float = Field(gt=0)
+    distancia_km: float | None = None
+    idTipoTarifa: int
+    nombreTipoTarifa: str
+    tarifa: float = Field(gt=0)
+    tarifa_base_ton_km: float | None = None
+    incluyeIVA: bool = False
+    hora_inicio_carga: datetime
+    hora_fin_carga: datetime
+    hora_inicio_descarga: datetime
+    hora_fin_descarga: datetime
+    requiere_balanza: bool = False
+    ubicacion_balanza: str | None = None
+    hora_inicio_balanza: datetime | None = None
+    hora_fin_balanza: datetime | None = None
 
     @field_validator("origen_lat", "destino_lat")
     @classmethod
@@ -241,6 +275,24 @@ class CargaCreate(BaseModel):
     def validate_dates(self) -> "CargaCreate":
         if self.fecha_entrega_deseada < self.fecha_retiro_deseada:
             raise ValueError("La fecha de entrega no puede ser anterior a la fecha de retiro")
+        
+        # Validar tiempos de carga
+        if self.hora_fin_carga <= self.hora_inicio_carga:
+            raise ValueError("La hora de fin de carga debe ser posterior a la de inicio")
+            
+        # Validar tiempos de descarga
+        if self.hora_fin_descarga <= self.hora_inicio_descarga:
+            raise ValueError("La hora de fin de descarga debe ser posterior a la de inicio")
+            
+        # Validar balanza
+        if self.requiere_balanza:
+            if not self.ubicacion_balanza or not self.ubicacion_balanza.strip():
+                raise ValueError("La ubicación de la balanza es obligatoria si requiere balanza")
+            if self.hora_inicio_balanza is None or self.hora_fin_balanza is None:
+                raise ValueError("Los horarios de balanza son obligatorios si requiere balanza")
+            if self.hora_fin_balanza <= self.hora_inicio_balanza:
+                raise ValueError("La hora de fin de balanza debe ser posterior a la de inicio")
+                
         return self
 
 
@@ -248,8 +300,10 @@ class CargaUpdate(BaseModel):
     titulo: str | None = Field(default=None, min_length=2, max_length=180)
     descripcion: str | None = None
     tipo_mercaderia: str | None = Field(default=None, min_length=2, max_length=150)
-    peso_kg: Decimal | None = Field(default=None, gt=0)
-    volumen_m3: Decimal | None = Field(default=None, gt=0)
+    peso_kg: float | None = Field(default=None, gt=0)
+    volumen_m3: float | None = Field(default=None, gt=0)
+    distancia_km: float | None = Field(default=None, gt=0)
+    tarifa_base_ton_km: float | None = Field(default=None, gt=0)
     requiere_refrigeracion: bool | None = None
     requiere_rampa: bool | None = None
     requiere_mantas: bool | None = None
@@ -266,6 +320,14 @@ class CargaUpdate(BaseModel):
     fecha_retiro_deseada: datetime | None = None
     fecha_entrega_deseada: datetime | None = None
     precio_referencia: Decimal | None = Field(default=None, ge=0)
+    hora_inicio_carga: datetime | None = None
+    hora_fin_carga: datetime | None = None
+    hora_inicio_descarga: datetime | None = None
+    hora_fin_descarga: datetime | None = None
+    requiere_balanza: bool | None = None
+    ubicacion_balanza: str | None = None
+    hora_inicio_balanza: datetime | None = None
+    hora_fin_balanza: datetime | None = None
 
     @field_validator("origen_lat", "destino_lat")
     @classmethod
@@ -284,8 +346,8 @@ class CargaResponse(ORMModel):
     titulo: str
     descripcion: str | None
     tipo_mercaderia: str
-    peso_kg: Decimal
-    volumen_m3: Decimal
+    peso_kg: float
+    volumen_m3: float
     requiere_refrigeracion: bool
     requiere_rampa: bool
     requiere_mantas: bool
@@ -302,6 +364,21 @@ class CargaResponse(ORMModel):
     fecha_retiro_deseada: datetime
     fecha_entrega_deseada: datetime
     precio_referencia: Decimal
+    cantidadKm: float
+    distancia_km: float
+    idTipoTarifa: int
+    nombreTipoTarifa: str
+    tarifa: float
+    tarifa_base_ton_km: float
+    incluyeIVA: bool
+    hora_inicio_carga: datetime
+    hora_fin_carga: datetime
+    hora_inicio_descarga: datetime
+    hora_fin_descarga: datetime
+    requiere_balanza: bool
+    ubicacion_balanza: str | None
+    hora_inicio_balanza: datetime | None
+    hora_fin_balanza: datetime | None
     estado: CargaEstado
     created_at: datetime
     updated_at: datetime
@@ -374,6 +451,7 @@ class TrackingPositionResponse(ORMModel):
     lng: Decimal
     velocidad: Decimal | None
     timestamp: datetime
+    alerta_seguridad: str | None = None
     created_at: datetime
 
 

@@ -129,9 +129,37 @@ export interface Carga {
   fecha_retiro_deseada: string;
   fecha_entrega_deseada: string;
   precio_referencia: DecimalValue;
+  cantidadKm: number;
+  distancia_km: number;
+  idTipoTarifa: number;
+  nombreTipoTarifa: string;
+  tarifa: DecimalValue;
+  tarifa_base_ton_km: number;
+  incluyeIVA: boolean;
+  hora_inicio_carga: string;
+  hora_fin_carga: string;
+  hora_inicio_descarga: string;
+  hora_fin_descarga: string;
+  requiere_balanza: boolean;
+  ubicacion_balanza?: string | null;
+  hora_inicio_balanza?: string | null;
+  hora_fin_balanza?: string | null;
   estado: CargaEstado;
   created_at: string;
   updated_at: string;
+}
+
+export interface PresupuestoRequest {
+  distancia_km: number;
+  peso_kg: number;
+  volumen_m3: number;
+  id_tipo_tarifa: number;
+}
+
+export interface PresupuestoResponse {
+  peso_tasable_kg: number;
+  motivo_tasacion: "peso_real" | "volumen_excedente";
+  presupuesto_sugerido: number;
 }
 
 export interface Oferta {
@@ -170,6 +198,7 @@ export interface TrackingPosition {
   lng: DecimalValue;
   velocidad?: DecimalValue | null;
   timestamp: string;
+  alerta_seguridad?: string | null;
   created_at: string;
 }
 

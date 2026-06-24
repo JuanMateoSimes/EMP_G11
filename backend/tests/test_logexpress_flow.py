@@ -123,6 +123,16 @@ def test_full_logexpress_mvp_flow(client):
             "fecha_retiro_deseada": retiro.isoformat(),
             "fecha_entrega_deseada": entrega.isoformat(),
             "precio_referencia": "100000",
+            "cantidadKm": 15.5,
+            "idTipoTarifa": 1,
+            "nombreTipoTarifa": "Por Kilómetro",
+            "tarifa": 100000.0,
+            "incluyeIVA": False,
+            "hora_inicio_carga": retiro.isoformat(),
+            "hora_fin_carga": (retiro + timedelta(hours=2)).isoformat(),
+            "hora_inicio_descarga": entrega.isoformat(),
+            "hora_fin_descarga": (entrega + timedelta(hours=2)).isoformat(),
+            "requiere_balanza": False,
         },
     )
     assert carga.status_code == 201, carga.text

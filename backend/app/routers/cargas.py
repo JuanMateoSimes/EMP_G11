@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_roles
 from app.models.enums import CargaEstado, UserRole
-from app.models.models import Carga, EmpresaPyme, User
-from app.schemas.schemas import CargaCreate, CargaResponse, CargaUpdate
+from app.models.models import Carga, EmpresaPyme, TipoTarifa, User
+from app.schemas.schemas import CargaCreate, CargaResponse, CargaUpdate, TipoTarifaResponse, PresupuestoRequest, PresupuestoResponse
 from app.services.business import ensure_pyme_owner_or_admin, get_pyme_for_user
 
 router = APIRouter(prefix="/api/cargas", tags=["Cargas"])
@@ -19,7 +19,13 @@ def create_carga(
     current_user: User = Depends(require_roles(UserRole.PYME)),
 ) -> Carga:
     pyme = get_pyme_for_user(db, current_user)
-    carga = Carga(empresa_id=pyme.id, **payload.model_dump())
+    data = payload.model_dump()
+    if data.get("distancia_km") is None:
+        data["distancia_km"] = data.get("cantidadKm") or 0.0
+    if data.get("tarifa_base_ton_km") is None:
+        tipo = db.get(TipoTarifa, data["idTipoTarifa"])
+        data["tarifa_base_ton_km"] = tipo.tarifa_base_ton_km if tipo else 0.0
+    carga = Carga(empresa_id=pyme.id, **data)
     db.add(carga)
     db.commit()
     db.refresh(carga)
@@ -47,6 +53,37 @@ def get_cargas_disponibles(
             .order_by(Carga.created_at.desc())
         )
     )
+
+
+@router.get("/tipostarifas", response_model=list[TipoTarifaResponse])
+def get_tipos_tarifas(db: Session = Depends(get_db)) -> list[TipoTarifa]:
+    return list(db.scalars(select(TipoTarifa).order_by(TipoTarifa.id.asc())).all())
+
+
+@router.post("/calcular-presupuesto", response_model=PresupuestoResponse)
+def calcular_presupuesto(
+    payload: PresupuestoRequest,
+    db: Session = Depends(get_db),
+) -> dict:
+    tipo_tarifa = db.get(TipoTarifa, payload.id_tipo_tarifa)
+    if tipo_tarifa is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tipo de tarifa no encontrado",
+        )
+    
+    FACTOR_VOLUMEN = 300.0
+    peso_volumetrico = payload.volumen_m3 * FACTOR_VOLUMEN
+    peso_tasable_kg = max(payload.peso_kg, peso_volumetrico)
+    toneladas_tasables = peso_tasable_kg / 1000.0
+    presupuesto_sugerido = toneladas_tasables * payload.distancia_km * tipo_tarifa.tarifa_base_ton_km
+    motivo_tasacion = "volumen_excedente" if peso_volumetrico > payload.peso_kg else "peso_real"
+    
+    return {
+        "peso_tasable_kg": peso_tasable_kg,
+        "motivo_tasacion": motivo_tasacion,
+        "presupuesto_sugerido": round(presupuesto_sugerido, 2),
+    }
 
 
 @router.get("/{carga_id}", response_model=CargaResponse)

@@ -6,6 +6,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     Enum,
+    Float,
     ForeignKey,
     Integer,
     Numeric,
@@ -136,6 +137,14 @@ class Documento(TimestampMixin, Base):
     observaciones: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class TipoTarifa(Base):
+    __tablename__ = "tipos_tarifas"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    nombre: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    tarifa_base_ton_km: Mapped[float] = mapped_column(Float, nullable=False, default=150.0)
+
+
 class Carga(TimestampMixin, Base):
     __tablename__ = "cargas"
 
@@ -144,8 +153,8 @@ class Carga(TimestampMixin, Base):
     titulo: Mapped[str] = mapped_column(String(180), nullable=False)
     descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)
     tipo_mercaderia: Mapped[str] = mapped_column(String(150), nullable=False)
-    peso_kg: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    volumen_m3: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    peso_kg: Mapped[float] = mapped_column(Float, nullable=False)
+    volumen_m3: Mapped[float] = mapped_column(Float, nullable=False)
     requiere_refrigeracion: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     requiere_rampa: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     requiere_mantas: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -162,6 +171,21 @@ class Carga(TimestampMixin, Base):
     fecha_retiro_deseada: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     fecha_entrega_deseada: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     precio_referencia: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    cantidadKm: Mapped[float] = mapped_column(Float, nullable=False)
+    distancia_km: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    idTipoTarifa: Mapped[int] = mapped_column(ForeignKey("tipos_tarifas.id"), nullable=False)
+    nombreTipoTarifa: Mapped[str] = mapped_column(String(100), nullable=False)
+    tarifa: Mapped[float] = mapped_column(Float, nullable=False)
+    tarifa_base_ton_km: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    incluyeIVA: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    hora_inicio_carga: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    hora_fin_carga: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    hora_inicio_descarga: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    hora_fin_descarga: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    requiere_balanza: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    ubicacion_balanza: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    hora_inicio_balanza: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    hora_fin_balanza: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     estado: Mapped[CargaEstado] = mapped_column(
         Enum(CargaEstado), default=CargaEstado.PUBLICADA, nullable=False, index=True
     )
@@ -230,6 +254,7 @@ class TrackingPosition(Base):
     lng: Mapped[Decimal] = mapped_column(Numeric(9, 6), nullable=False)
     velocidad: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    alerta_seguridad: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
