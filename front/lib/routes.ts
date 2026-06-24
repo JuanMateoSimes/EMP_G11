@@ -1,3 +1,4 @@
+import type { Role } from "@/lib/types";
 import {
   Bell,
   ClipboardCheck,
@@ -12,11 +13,13 @@ import {
   Truck,
   UserRound,
   Users,
-  WalletCards
+  WalletCards,
 } from "lucide-react";
-import type { Role } from "@/lib/types";
 
-export const navByRole: Record<Role, Array<{ href: string; label: string; icon: typeof LayoutDashboard }>> = {
+export const navByRole: Record<
+  Role,
+  Array<{ href: string; label: string; icon: typeof LayoutDashboard }>
+> = {
   ADMIN: [
     { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/admin/usuarios", label: "Usuarios", icon: Users },
@@ -38,13 +41,22 @@ export const navByRole: Record<Role, Array<{ href: string; label: string; icon: 
     { href: "/dashboard/configuracion", label: "Configuración", icon: Settings }
   ],
   TRANSPORTISTA: [
-    { href: "/transportista/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/transportista/cargas-disponibles", label: "Cargas", icon: Package },
+    {
+      href: "/transportista/dashboard",
+      label: "Dashboard",
+      icon: LayoutDashboard,
+    },
+    {
+      href: "/transportista/cargas-disponibles",
+      label: "Cargas",
+      icon: Package,
+    },
     { href: "/transportista/ofertas", label: "Ofertas", icon: ClipboardCheck },
     { href: "/transportista/viajes", label: "Viajes", icon: Route },
     { href: "/transportista/vehiculos", label: "Vehiculos", icon: Truck },
     { href: "/transportista/documentos", label: "Documentos", icon: Files },
     { href: "/transportista/perfil", label: "Perfil", icon: UserRound },
+    { href: "/transportista/billetera", label: "Billetera", icon: WalletCards },
     { href: "/dashboard/configuracion", label: "Configuración", icon: Settings }
   ]
 };
