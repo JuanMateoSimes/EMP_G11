@@ -423,6 +423,12 @@ export function NuevaCargaPage() {
     setError(null);
     setSuccess(null);
     try {
+      const combineDateAndTime = (dateStr: string, timeStr: string) => {
+        if (!dateStr || !timeStr) return "";
+        const datePart = dateStr.includes("T") ? dateStr.split("T")[0] : dateStr;
+        return `${datePart}T${timeStr}`;
+      };
+
       const carga = await api.cargas.create({
         ...values,
         idsTiposAcoplados: values.idsTiposAcoplados,
@@ -432,14 +438,14 @@ export function NuevaCargaPage() {
         precio_referencia: values.tarifa,
         distancia_km: Number(values.cantidadKm),
         tarifa_base_ton_km: Number(values.tarifa_base_ton_km || 0),
-        hora_inicio_carga: values.requiere_ventana_carga && values.hora_inicio_carga ? isoFromInput(values.hora_inicio_carga) : null,
-        hora_fin_carga: values.requiere_ventana_carga && values.hora_fin_carga ? isoFromInput(values.hora_fin_carga) : null,
-        hora_inicio_descarga: values.requiere_ventana_descarga && values.hora_inicio_descarga ? isoFromInput(values.hora_inicio_descarga) : null,
-        hora_fin_descarga: values.requiere_ventana_descarga && values.hora_fin_descarga ? isoFromInput(values.hora_fin_descarga) : null,
+        hora_inicio_carga: values.requiere_ventana_carga && values.hora_inicio_carga ? isoFromInput(combineDateAndTime(values.fecha_retiro_deseada, values.hora_inicio_carga)) : null,
+        hora_fin_carga: values.requiere_ventana_carga && values.hora_fin_carga ? isoFromInput(combineDateAndTime(values.fecha_retiro_deseada, values.hora_fin_carga)) : null,
+        hora_inicio_descarga: values.requiere_ventana_descarga && values.hora_inicio_descarga ? isoFromInput(combineDateAndTime(values.fecha_entrega_deseada, values.hora_inicio_descarga)) : null,
+        hora_fin_descarga: values.requiere_ventana_descarga && values.hora_fin_descarga ? isoFromInput(combineDateAndTime(values.fecha_entrega_deseada, values.hora_fin_descarga)) : null,
         requiere_balanza: values.requiere_balanza,
         ubicacion_balanza: values.requiere_balanza ? (values.ubicacion_balanza || null) : null,
-        hora_inicio_balanza: values.requiere_balanza && values.hora_inicio_balanza ? isoFromInput(values.hora_inicio_balanza) : null,
-        hora_fin_balanza: values.requiere_balanza && values.hora_fin_balanza ? isoFromInput(values.hora_fin_balanza) : null,
+        hora_inicio_balanza: values.requiere_balanza && values.hora_inicio_balanza ? isoFromInput(combineDateAndTime(values.fecha_retiro_deseada, values.hora_inicio_balanza)) : null,
+        hora_fin_balanza: values.requiere_balanza && values.hora_fin_balanza ? isoFromInput(combineDateAndTime(values.fecha_retiro_deseada, values.hora_fin_balanza)) : null,
         origen_lat: null,
         origen_lng: null,
         destino_lat: null,
@@ -537,13 +543,13 @@ export function NuevaCargaPage() {
                   <div className="grid gap-3 border-t border-line pt-3 md:grid-cols-2">
                     <FormInput
                       label="Inicio de carga"
-                      type="datetime-local"
+                      type="time"
                       error={form.formState.errors.hora_inicio_carga?.message}
                       {...form.register("hora_inicio_carga")}
                     />
                     <FormInput
                       label="Fin de carga"
-                      type="datetime-local"
+                      type="time"
                       error={form.formState.errors.hora_fin_carga?.message}
                       {...form.register("hora_fin_carga")}
                     />
@@ -574,13 +580,13 @@ export function NuevaCargaPage() {
                   <div className="grid gap-3 border-t border-line pt-3 md:grid-cols-2">
                     <FormInput
                       label="Inicio de descarga"
-                      type="datetime-local"
+                      type="time"
                       error={form.formState.errors.hora_inicio_descarga?.message}
                       {...form.register("hora_inicio_descarga")}
                     />
                     <FormInput
                       label="Fin de descarga"
-                      type="datetime-local"
+                      type="time"
                       error={form.formState.errors.hora_fin_descarga?.message}
                       {...form.register("hora_fin_descarga")}
                     />
@@ -616,13 +622,13 @@ export function NuevaCargaPage() {
                     <div className="grid gap-3 md:grid-cols-2">
                       <FormInput
                         label="Horario inicio balanza"
-                        type="datetime-local"
+                        type="time"
                         error={form.formState.errors.hora_inicio_balanza?.message}
                         {...form.register("hora_inicio_balanza")}
                       />
                       <FormInput
                         label="Horario fin balanza"
-                        type="datetime-local"
+                        type="time"
                         error={form.formState.errors.hora_fin_balanza?.message}
                         {...form.register("hora_fin_balanza")}
                       />

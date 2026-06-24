@@ -338,6 +338,53 @@ class CargaUpdate(BaseModel):
         return _validate_lng(value)
 
 
+class ContratoGranosCreate(BaseModel):
+    carga_id: int | None = None
+    numero_contrato: str = Field(..., min_length=1, max_length=100)
+    fecha_inicio_contrato: datetime
+    fecha_fin_contrato: datetime
+    productor_id: str = Field(..., min_length=1, max_length=50)
+    productor_nombre: str = Field(..., min_length=1, max_length=255)
+    exportador_id: str = Field(..., min_length=1, max_length=50)
+    exportador_nombre: str = Field(..., min_length=1, max_length=255)
+    tipo_grano: str = Field(..., min_length=1, max_length=100)
+    calidad_grano: str = Field(..., min_length=1, max_length=100)
+    humedad_maxima_permitida: float = Field(..., ge=0.0, le=100.0)
+    impurezas_maximas_permitidas: float = Field(..., ge=0.0, le=100.0)
+    planta_procedencia_ruca: str = Field(..., min_length=1, max_length=100)
+    planta_destino_ruca: str = Field(..., min_length=1, max_length=100)
+    cantidad_total_kg: float = Field(..., gt=0.0)
+    precio_por_kg: float = Field(..., gt=0.0)
+
+    @model_validator(mode="after")
+    def validate_dates_and_values(self) -> "ContratoGranosCreate":
+        if self.fecha_fin_contrato < self.fecha_inicio_contrato:
+            raise ValueError("La fecha de fin no puede ser anterior a la fecha de inicio")
+        return self
+
+
+class ContratoGranosResponse(ORMModel):
+    id: int
+    carga_id: int | None
+    numero_contrato: str
+    fecha_inicio_contrato: datetime
+    fecha_fin_contrato: datetime
+    productor_id: str
+    productor_nombre: str
+    exportador_id: str
+    exportador_nombre: str
+    tipo_grano: str
+    calidad_grano: str
+    humedad_maxima_permitida: float
+    impurezas_maximas_permitidas: float
+    planta_procedencia_ruca: str
+    planta_destino_ruca: str
+    cantidad_total_kg: float
+    precio_por_kg: float
+    created_at: datetime
+    updated_at: datetime
+
+
 class CargaResponse(ORMModel):
     id: int
     empresa_id: int
@@ -378,6 +425,8 @@ class CargaResponse(ORMModel):
     estado: CargaEstado
     created_at: datetime
     updated_at: datetime
+    contrato: ContratoGranosResponse | None = None
+
 
 
 class OfertaCreate(BaseModel):
@@ -509,49 +558,3 @@ class PymeDashboardResponse(BaseModel):
     cuenta_verificada: bool
     actividad_reciente: list[ActividadReciente]
 
-
-class ContratoGranosCreate(BaseModel):
-    carga_id: int | None = None
-    numero_contrato: str = Field(..., min_length=1, max_length=100)
-    fecha_inicio_contrato: datetime
-    fecha_fin_contrato: datetime
-    productor_id: str = Field(..., min_length=1, max_length=50)
-    productor_nombre: str = Field(..., min_length=1, max_length=255)
-    exportador_id: str = Field(..., min_length=1, max_length=50)
-    exportador_nombre: str = Field(..., min_length=1, max_length=255)
-    tipo_grano: str = Field(..., min_length=1, max_length=100)
-    calidad_grano: str = Field(..., min_length=1, max_length=100)
-    humedad_maxima_permitida: float = Field(..., ge=0.0, le=100.0)
-    impurezas_maximas_permitidas: float = Field(..., ge=0.0, le=100.0)
-    planta_procedencia_ruca: str = Field(..., min_length=1, max_length=100)
-    planta_destino_ruca: str = Field(..., min_length=1, max_length=100)
-    cantidad_total_kg: float = Field(..., gt=0.0)
-    precio_por_kg: float = Field(..., gt=0.0)
-
-    @model_validator(mode="after")
-    def validate_dates_and_values(self) -> "ContratoGranosCreate":
-        if self.fecha_fin_contrato < self.fecha_inicio_contrato:
-            raise ValueError("La fecha de fin no puede ser anterior a la fecha de inicio")
-        return self
-
-
-class ContratoGranosResponse(ORMModel):
-    id: int
-    carga_id: int | None
-    numero_contrato: str
-    fecha_inicio_contrato: datetime
-    fecha_fin_contrato: datetime
-    productor_id: str
-    productor_nombre: str
-    exportador_id: str
-    exportador_nombre: str
-    tipo_grano: str
-    calidad_grano: str
-    humedad_maxima_permitida: float
-    impurezas_maximas_permitidas: float
-    planta_procedencia_ruca: str
-    planta_destino_ruca: str
-    cantidad_total_kg: float
-    precio_por_kg: float
-    created_at: datetime
-    updated_at: datetime

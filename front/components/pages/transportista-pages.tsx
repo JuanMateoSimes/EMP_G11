@@ -355,6 +355,29 @@ export function TransportistaViajeDetailPage({ id }: { id: number }) {
               <TrackingPanel positions={resource.data.tracking} carga={resource.data.carga} />
             </div>
             <div className="space-y-4">
+              {resource.data.carga.contrato && (
+                <Card className="p-4 border-l-4 border-emerald-500 bg-emerald-50/10">
+                  <div className="flex items-start gap-3">
+                    <ClipboardCheck className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Contrato Digital de Granos</p>
+                      <h3 className="mt-1 font-bold text-slate-950">
+                        {resource.data.carga.contrato.numero_contrato}
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1">
+                        {resource.data.carga.contrato.tipo_grano} ({resource.data.carga.contrato.calidad_grano})
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <Link href={`/transportista/contratos/${resource.data.carga.contrato.id}`}>
+                      <Button variant="secondary" className="w-full text-xs font-bold uppercase tracking-wider">
+                        Ver Documento
+                      </Button>
+                    </Link>
+                  </div>
+                </Card>
+              )}
               <Card className="p-4">
                 <div className="mb-3 flex items-center justify-between">
                   <h2 className="font-black text-slate-950">Actualizar estado</h2>

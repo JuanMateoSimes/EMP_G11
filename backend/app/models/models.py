@@ -219,6 +219,7 @@ class Carga(TimestampMixin, Base):
     empresa: Mapped[EmpresaPyme] = relationship(back_populates="cargas")
     ofertas: Mapped[list["Oferta"]] = relationship(back_populates="carga")
     viaje: Mapped["Viaje | None"] = relationship(back_populates="carga")
+    contrato: Mapped["ContratoGranos | None"] = relationship(back_populates="carga", uselist=False, lazy="joined")
 
 
 class Oferta(TimestampMixin, Base):
@@ -370,4 +371,4 @@ class ContratoGranos(TimestampMixin, Base):
     cantidad_total_kg: Mapped[float] = mapped_column(Float, nullable=False)
     precio_por_kg: Mapped[float] = mapped_column(Float, nullable=False)
 
-    carga: Mapped["Carga | None"] = relationship()
+    carga: Mapped["Carga | None"] = relationship(back_populates="contrato")

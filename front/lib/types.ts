@@ -145,6 +145,7 @@ export interface Carga {
   estado: CargaEstado;
   created_at: string;
   updated_at: string;
+  contrato?: ContratoGranos | null;
 }
 
 export interface PresupuestoRequest {
